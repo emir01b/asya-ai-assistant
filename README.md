@@ -9,7 +9,22 @@
 [![Ollama](https://img.shields.io/badge/Ollama-000000?style=for-the-badge&logo=ollama&logoColor=white)](https://ollama.ai)
 [![MIT License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-<img src="https://github.com/user-attachments/assets/asya-banner" alt="ASYA Banner" width="800"/>
+### 📸 **Uygulama Görselleri**
+
+<table>
+<tr>
+<td align="center" width="50%">
+<img src="images/resim1.png" alt="ASYA Ana Arayüz" width="100%" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);"/>
+<br/>
+<sub><b>🎙️ Ana Arayüz - Sesli Etkileşim</b></sub>
+</td>
+<td align="center" width="50%">
+<img src="images/resim2.png" alt="ASYA Ayarlar Panel" width="100%" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);"/>
+<br/>
+<sub><b>⚙️ Ayarlar Paneli - Model Konfigürasyonu</b></sub>
+</td>
+</tr>
+</table>
 
 **🚀 Gizliliği koruyarak, bilgisayarınızda tamamen çevrimdışı çalışan gelişmiş AI asistan**
 
