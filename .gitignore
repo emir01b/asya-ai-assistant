@@ -1,0 +1,49 @@
+# Operating system and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Python environments and generated files
+.venv/
+.venv-stt/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Frontend dependencies and builds
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+# Local configuration, conversations, recordings, models and certificates
+.env
+.env.*
+!.env.example
+data/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.log
+*.wav
+*.mp3
+*.flac
+*.pt
+*.pth
+*.safetensors
+*.gguf
+*.key
+*.pem
+*.dpapi
+
+# Locally provisioned upstream source; tracked changes belong in patches/
+/chatterbox/
