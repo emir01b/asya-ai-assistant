@@ -1,422 +1,129 @@
 <div align="center">
 
-# 🎙️ ASYA - Akıllı Sesli Yapay Zeka Asistanı
+# 🎙️ ASYA
 
-*Tamamen Yerel Çalışan, Türkçe Destekli AI Asistan*
+**Yerel çalışan, Türkçe destekli sesli yapay zekâ asistanı**
 
-[![Python](https://img.shields.io/badge/Python-3.11+-3776ab?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io)
-[![Ollama](https://img.shields.io/badge/Ollama-000000?style=for-the-badge&logo=ollama&logoColor=white)](https://ollama.ai)
-[![MIT License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![React](https://img.shields.io/badge/React-19-149ECA?style=for-the-badge&logo=react&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-### 📸 **Uygulama Görselleri**
+Ses üretimi · Referans ses profilleri · Streaming sesli sohbet
 
-<table>
-<tr>
-<td align="center" width="50%">
-<img src="images/resim1.png" alt="ASYA Ana Arayüz" width="100%" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);"/>
-<br/>
-<sub><b>🎙️ Ana Arayüz - Sesli Etkileşim</b></sub>
-</td>
-<td align="center" width="50%">
-<img src="images/resim2.png" alt="ASYA Ayarlar Panel" width="100%" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);"/>
-<br/>
-<sub><b>⚙️ Ayarlar Paneli - Model Konfigürasyonu</b></sub>
-</td>
-</tr>
-</table>
-
-**🚀 Gizliliği koruyarak, bilgisayarınızda tamamen çevrimdışı çalışan gelişmiş AI asistan**
-
-[⚡ Hızlı Başlangıç](#hızlı-başlangıç) • [📖 Dokümantasyon](#dokümantasyon) • [🤝 Katkıda Bulun](#katkıda-bulunma)
+[Kurulum](KURULUM.md) · [Katkıda bulunma](CONTRIBUTING.md) · [Lisans](LICENSE)
 
 </div>
 
----
+## Uygulamadan görüntüler
 
-## ✨ Özellikler
+### Ses Stüdyosu
 
-<table>
-<tr>
-<td width="50%">
+![ASYA Ses Stüdyosu: metin, dil, referans ses ve ifade ayarları](images/asya-studio.png)
 
-### 🎙️ **Gelişmiş Ses İşleme**
-- 🎯 **Gerçek zamanlı konuşma tanıma**
-- 📁 **Çoklu format desteği** (WAV, MP3, M4A)
-- 🇹🇷 **Türkçe optimize edilmiş**
-- 🔄 **Yedek STT sistemi**
+### Sesli sohbet
 
-### 🤖 **Güçlü AI Motor**
-- ⚡ **Mistral 7B modeli** (Türkçe'de üstün performans)
-- 🔒 **%100 yerel çalışır** (internet gerektirmez)
-- 🎛️ **Özelleştirilebilir parametreler**
-- 💨 **Hızlı yanıt süreleri**
+![ASYA sesli sohbet: mikrofon, konuşma ve ses oynatma alanı](images/asya-chat.png)
 
-</td>
-<td width="50%">
+Görüntüler gerçek ASYA arayüzünden, boş bir demo veri alanıyla alınmıştır.
+Kişisel konuşmalar veya ses kayıtları içermez; üretilmiş bir yanıt göstermez.
 
-### 🔊 **Doğal Türkçe Sesler**
-- 🎭 **5+ profesyonel Türkçe ses**
-- 🎚️ **Ayarlanabilir hız/ton**
-- 🎪 **Microsoft Edge-TTS** teknolojisi
-- 📢 **Kristal kalitede ses**
+## ASYA ile neler yapabilirsiniz?
 
-### 💾 **Akıllı Hafıza**
-- 🧠 **Konuşma geçmişini hatırlar**
-- 🔍 **Gelişmiş arama özellikleri**
-- 💽 **SQLite veritabanı**
-- 🗂️ **Oturum yönetimi**
+| Özellik | Nasıl çalışır? |
+| --- | --- |
+| Metinden ses | Chatterbox ile yerel ses üretimi, dil ve ifade ayarları |
+| Referans ses profilleri | Kullanım izni bulunan kayıtlarla ses kütüphanesi |
+| Sesli sohbet | Tarayıcı mikrofonu → Whisper → LM Studio → Chatterbox |
+| Akış halinde yanıt | LLM yanıtı sürerken tamamlanan ifadelerin seslendirilmesi |
+| Konuşma kontrolü | Yanıtı durdurma, isteğe bağlı konuşarak araya girme ve tempo ayarı |
+| Kalıcılık | SQLite üzerinde konuşmalar, ayarlar ve üretim geçmişi |
+| Ses çıktıları | WAV/MP3 indirme, geçmişi dinleme ve karşılaştırma |
+| Tanılama | İş durumu, hata kayıtları ve GPU bilgileri |
+| Yerel ağ | İsteğe bağlı HTTPS ile aynı ağdaki cihazlardan erişim |
 
-</td>
-</tr>
-</table>
+İfade ayarları model parametrelerini değiştirir; belirli bir duyguyu veya kahkaha/ağlama
+üretimini garanti etmez. Chatterbox her ses parçasını tamamladıktan sonra oynatma başlar.
 
----
+## Hızlı başlangıç
 
-## 🚀 Hızlı Başlangıç
+Mevcut Python/CUDA ortamı hazırlanmış bir Windows bilgisayarda, repo kökünden:
 
-### ⚡ Tek Komutla Kurulum
-
-```bash
-git clone https://github.com/emir01b/asya-ai-assistant.git
-cd asya-ai-assistant
-chmod +x quick-start.sh
-./quick-start.sh
+```powershell
+.\scripts\start-app.ps1
 ```
 
-<details>
-<summary>📋 <strong>Manuel Kurulum (Adım Adım)</strong></summary>
+Tarayıcı: **http://127.0.0.1:8000**. LM Studio'da yerel API sunucusunu başlatın,
+bir sohbet modeli yükleyin ve ASYA'nın Ayarlar ekranından adres/model seçin.
 
-### 1. Ön Gereksinimler
+Yeni kuruluma veya mevcut `voice-lab` ortamını bağlamaya başlamadan önce
+[Kurulum rehberini](KURULUM.md) okuyun. `pip install -r requirements.txt` tek başına
+CUDA, Chatterbox, model ağırlıkları ve frontend kurulumunu tamamlamaz.
 
-| Gereksinim | Minimum | Önerilen |
-|------------|---------|----------|
-| **Python** | 3.11+ | 3.13+ |
-| **RAM** | 8GB | 16GB+ |
-| **Depolama** | 10GB | 20GB+ |
-| **Platform** | Windows/macOS/Linux | - |
+> **Geçiş durumu:** Yeni sürüm `evolution/voice-studio` dalına parça parça
+> aktarılıyor. Frontend ve başlatıcılar ayrı commitlerdir; bu komutlar ilgili
+> dosyaların bulunduğu tam çalışma kopyası içindir. Sıfırdan temiz AI ortamı
+> kurulumu henüz doğrulanmış değildir.
 
-### 2. Bağımlılıkları Kurun
+## Mimari
 
-```bash
-# Sanal ortam oluştur
-python3 -m venv venv
-source venv/bin/activate  # Linux/macOS
-# venv\Scripts\activate   # Windows
-
-# Python paketlerini kur
-pip install -r requirements.txt
+```text
+Tarayıcı / React
+  ├─ Mikrofon ve ses oynatma
+  └─ HTTP / WebSocket
+       └─ FastAPI
+            ├─ SQLite: ayarlar, konuşmalar ve işler
+            ├─ LM Studio: yerel LLM, streaming yanıt
+            └─ GPU kuyruğu
+                 ├─ Chatterbox: metinden ses
+                 └─ İzole Whisper worker: konuşma tanıma
 ```
 
-### 3. Sistem Bileşenlerini Kurun
-
-<details>
-<summary><strong>🍎 macOS</strong></summary>
-
-```bash
-# Homebrew ile
-brew install ollama ffmpeg portaudio
-
-# Ollama servisini başlat
-brew services start ollama
-```
-</details>
-
-<details>
-<summary><strong>🐧 Linux (Ubuntu/Debian)</strong></summary>
-
-```bash
-# Sistem paketleri
-sudo apt update
-sudo apt install ffmpeg portaudio19-dev
-
-# Ollama kurulumu
-curl -fsSL https://ollama.ai/install.sh | sh
-```
-</details>
-
-<details>
-<summary><strong>🪟 Windows</strong></summary>
-
-```bash
-# Chocolatey ile
-choco install ollama ffmpeg
-
-# Veya resmi sitelerden indirin:
-# https://ollama.ai/download
-# https://ffmpeg.org/download.html
-```
-</details>
-
-### 4. AI Modelini İndirin
-
-```bash
-# Mistral 7B modelini indir (Türkçe'de en iyi performans)
-ollama pull mistral:7b
+```text
+apps/backend/       API, ses motorları, kalıcılık ve backend testleri
+apps/frontend/      ASYA arayüzü ve frontend/tarayıcı testleri
+scripts/            Başlatma, ortam kontrolü ve doğrulama araçları
+docs/               Mimari notları ve OpenAPI sözleşmesi
+images/             README ekran görüntüleri
+data/               Yerel kullanıcı verileri ve modeller; Git dışında
 ```
 
-### 5. Uygulamayı Başlatın
+## Gereksinimler ve kapsam
 
-```bash
-streamlit run main.py
+- Windows üzerinde Python 3.11 ve Node.js >=22.12.0.
+- GPU kullanımı için uyumlu NVIDIA/CUDA/Torch ortamı. Mevcut doğrulama RTX 5060 Ti
+  16 GB ve Torch 2.10.0+cu128 ortamında yapılmıştır; bu bir minimum donanım garantisi değildir.
+- Sesli asistan için çalışan LM Studio sunucusu ve yüklenmiş bir sohbet modeli.
+- Whisper için ana Python ortamından ayrı `.venv-stt` ortamı.
+- LAN HTTPS kurulumu için PowerShell 7 ve istemci cihazında yerel CA güveni.
+
+Yeni sürümün macOS/Linux çalışması, fiziksel mikrofon/oda yankısı ve sıfırdan
+kurulum bu aktarımda doğrulanmadı. Masaüstü Tauri/Electron paketi ve Fish S2
+entegrasyonu henüz tamamlanmadı.
+
+## Gizlilik ve yerel çalışma
+
+Ses motorları yerel çalışır. İlk paket/model indirmeleri internet gerektirir;
+offline mod mevcut model önbelleklerini kullanır. LM Studio ayrı bir süreçtir.
+
+Konuşmalar, referans sesler, üretimler, modeller ve sertifikalar `data/` altında
+saklanır ve Git'e eklenmez. LAN modu açılırsa aynı ağdaki cihazlar uygulamanın
+kayıtlarına erişebilir; güvenilen bir ağda kullanın.
+
+## Geliştirme ve test
+
+Hazırlanmış ortamda:
+
+```powershell
+.\scripts\test.ps1
 ```
 
-🎉 **Tebrikler!** Tarayıcınızda `http://localhost:8501` adresine gidin!
-
-</details>
-
----
-
-## 🎮 Kullanım
-
-<div align="center">
-
-### 🎙️ Sesli Etkileşim
-**Mikrofon** → **Konuş** → **ASYA Yanıtlar**
-
-### ⌨️ Metin Girişi  
-**Mesaj Yaz** → **Enter** → **Sesli+Yazılı Yanıt**
-
-### 📁 Ses Dosyası
-**Dosya Yükle** → **Otomatik İşleme** → **AI Analizi**
-
-</div>
-
----
-
-## 🏗️ Mimari
-
-```mermaid
-graph TB
-    A[🎙️ Mikrofon/Dosya] --> B[🔄 Speech-to-Text]
-    B --> C[🧠 Mistral 7B AI]
-    C --> D[🔊 Text-to-Speech]
-    C --> E[💾 Hafıza Sistemi]
-    E --> C
-    
-    subgraph "🔒 Yerel Çalışma"
-        B
-        C
-        D
-        E
-    end
-```
-
----
-
-## 📊 Performans Metrikleri
-
-<div align="center">
-
-| 🎯 Bileşen | ⚡ Başlatma | 🚀 Yanıt | 💾 RAM |
-|-------------|-------------|----------|---------|
-| **STT (Whisper)** | ~2s | <1s | ~500MB |
-| **AI (Mistral)** | ~3s | 1-2s | ~4GB |
-| **TTS (Edge)** | <1s | <1s | ~100MB |
-| **📈 Toplam** | ~5s | **2-3s** | **~5GB** |
-
-</div>
-
----
-
-## ⚙️ Konfigürasyon
-
-### 🎛️ Model Ayarları
-
-```python
-# config.py
-OLLAMA_MODEL = "mistral:7b"       # AI Model
-TEMPERATURE = 0.7                 # Yaratıcılık (0.0-1.0)
-MAX_TOKENS = 300                  # Yanıt uzunluğu
-```
-
-### 🎭 Ses Seçenekleri
-
-| Ses | Cinsiyet | Karakter | Kod |
-|-----|----------|----------|-----|
-| 🎭 Emel | Kadın | Nazik, profesyonel | `tr-TR-EmelNeural` |
-| 👨 Ahmet | Erkek | Güçlü, otoriteli | `tr-TR-AhmetNeural` |
-| 🙂 Rıfat | Erkek | Samimi, sıcak | `tr-TR-RıfatNeural` |
-| 🌟 Cansu | Kadın | Genç, dinamik | `tr-TR-CansuNeural` |
-| 🎖️ Kartal | Erkek | Olgun, sakin | `tr-TR-KartalNeural` |
-
----
-
-## 🛠️ Geliştirme
-
-### 📁 Proje Yapısı
-
-```
-asya-ai-assistant/
-├── 🎯 main.py                 # Ana uygulama (Streamlit)
-├── ⚙️ config.py              # Yapılandırma
-├── 🎙️ speech_processor.py    # Ses tanıma
-├── 🤖 llm_processor.py       # AI model işleyici  
-├── 🔊 tts_processor.py       # Ses sentezi
-├── 💾 memory_manager.py      # Veritabanı yöneticisi
-├── 🧪 test_components.py     # Sistem testleri
-├── ⚡ setup.py               # Otomatik kurulum
-└── 📦 requirements.txt       # Python bağımlılıkları
-```
-
-### 🧪 Test Etme
-
-```bash
-# Tüm sistem bileşenlerini test et
-python test_components.py
-
-# Belirli bileşeni test et
-python -m pytest tests/ -v
-```
-
----
-
-## 🌍 Platform Desteği
-
-<div align="center">
-
-| Platform | Durum | Test Edildi |
-|----------|-------|-------------|
-| 🍎 **macOS** (Intel/M1/M2) | ✅ Tam Destek | ✅ |
-| 🐧 **Linux** (Ubuntu 20.04+) | ✅ Tam Destek | ✅ |
-| 🪟 **Windows** (10/11) | ✅ Tam Destek | ✅ |
-
-</div>
-
----
-
-## 🔐 Gizlilik & Güvenlik
-
-<div align="center">
-
-| Özellik | Durumu |
-|---------|--------|
-| 🔒 **Yerel İşleme** | ✅ %100 Çevrimdışı |
-| 🚫 **Veri Paylaşımı** | ❌ Hiç Veri Gönderilmez |
-| 💾 **Yerel Depolama** | ✅ SQLite Veritabanı |
-| 🗑️ **Veri Silme** | ✅ Tam Kontrol |
-
-</div>
-
----
-
-## 🐛 Sorun Giderme
-
-<details>
-<summary><strong>❓ Sık Karşılaşılan Sorunlar</strong></summary>
-
-### 1. 🎙️ Mikrofon Çalışmıyor
-```bash
-# macOS: Sistem Tercihleri > Güvenlik > Mikrofon
-# Linux: 
-sudo apt install pulseaudio
-```
-
-### 2. 🤖 Ollama Bağlantı Sorunu
-```bash
-# Servisi kontrol et
-ollama list
-
-# Yeniden başlat
-ollama serve
-```
-
-### 3. 📦 Python Modül Hatası
-```bash
-# Sanal ortamı kontrol et
-which python3
-
-# Bağımlılıkları güncelle
-pip install --upgrade -r requirements.txt
-```
-
-</details>
-
----
-
-## 🤝 Katkıda Bulunma
-
-Bu projeye katkıda bulunmak isterseniz:
-
-1. 🍴 **Fork** edin
-2. 🌿 **Feature branch** oluşturun (`git checkout -b feature/amazing-feature`)
-3. 💾 **Commit** edin (`git commit -m 'feat: add amazing feature'`)
-4. 📤 **Push** edin (`git push origin feature/amazing-feature`)
-5. 🔄 **Pull Request** oluşturun
-
-### 🎯 Katkı Alanları
-
-- 🐛 **Bug düzeltmeleri**
-- ✨ **Yeni özellikler** 
-- 📚 **Dokümantasyon iyileştirmeleri**
-- 🌍 **Çoklu dil desteği**
-- 🎨 **UI/UX iyileştirmeleri**
-
----
-
-## 🙏 Teşekkürler
-
-Bu proje harika açık kaynak projeleri kullanır:
-
-<div align="center">
-
-[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
-[![Ollama](https://img.shields.io/badge/Ollama-000000?style=for-the-badge&logo=ollama&logoColor=white)](https://ollama.ai/)
-[![OpenAI](https://img.shields.io/badge/Whisper-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com/research/whisper)
-[![Microsoft](https://img.shields.io/badge/Edge_TTS-0078D4?style=for-the-badge&logo=microsoft&logoColor=white)](https://github.com/rany2/edge-tts)
-
-</div>
-
----
-
-## 📈 İstatistikler
-
-<div align="center">
-
-![GitHub stars](https://img.shields.io/github/stars/emir01b/asya-ai-assistant?style=social)
-![GitHub forks](https://img.shields.io/github/forks/emir01b/asya-ai-assistant?style=social)
-![GitHub issues](https://img.shields.io/github/issues/emir01b/asya-ai-assistant)
-![GitHub license](https://img.shields.io/github/license/emir01b/asya-ai-assistant)
-
-**📊 Proje Metrikleri:**
-- 📝 ~2,500 satır kod
-- 🧩 8 ana modül  
-- 🎯 95%+ test coverage
-- 🌍 3 platform desteği
-- 🗣️ 5 Türkçe ses seçeneği
-
-</div>
-
----
-
-## 📞 İletişim & Destek
-
-<div align="center">
-
-### 👨‍💻 Geliştirici: **Emirhan**
-
-[![Email](https://img.shields.io/badge/Email-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:emirgdogduu@gmail.com)
-[![GitHub](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)](https://github.com/emir01b)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](#)
-
-**🔧 Uzmanlık Alanları:** Cyber Security • Fullstack Web 
-
-</div>
-
----
-
-## 📄 Lisans
-
-Bu proje **MIT Lisansı** altında lisanslanmıştır. Detaylar için [LICENSE](LICENSE) dosyasına bakın.
-
----
-
-<div align="center">
-
-### ⭐ Projeyi beğendiyseniz yıldız vermeyi unutmayın! ⭐
-
-**🚀 ASYA ile geleceğin sesli AI deneyimini yaşayın! 🎙️**
-
-*Made with ❤️ in Turkey 🇹🇷*
-
-</div> 
+Bu komut backend testlerini, frontend testlerini ve production derlemesini çalıştırır.
+Gerçek GPU/model ve tarayıcı doğrulamaları ayrı araçlarla yapılır. Aktarım sırasında
+60 backend ve 10 frontend testi ile production derlemesi başarılıydı; bunlar fiziksel
+mikrofon veya sıfırdan kurulum doğrulaması anlamına gelmez.
+
+## Lisans
+
+ASYA kaynakları [MIT](LICENSE) lisanslıdır. Chatterbox, Whisper, model ağırlıkları
+ve diğer bağımlılıklar kendi lisans koşullarına tabidir.

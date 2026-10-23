@@ -1,0 +1,3 @@
+# Separate .venv-stt only. Do not install into the Chatterbox environment.
+faster-whisper==1.2.1
+ctranslate2==4.8.3
