@@ -1,8 +1,5 @@
-streamlit>=1.28.1
-faster-whisper>=1.0.0
-sounddevice>=0.4.0
-speechrecognition>=3.10.0
-edge-tts>=6.1.9
-ollama>=0.1.7
-pydub>=0.25.1
-requests>=2.25.1 
+# ASYA API dependencies; not a complete speech/CUDA environment installer.
+# Provision the compatible Chatterbox/Torch environment first (see KURULUM.md).
+# Install STT dependencies separately in .venv-stt using
+# apps/backend/requirements-stt.txt; frontend dependencies use npm ci.
+-r apps/backend/requirements.txt
