@@ -123,14 +123,6 @@ Gerçek GPU/model ve tarayıcı doğrulamaları ayrı araçlarla yapılır. Akta
 60 backend ve 10 frontend testi ile production derlemesi başarılıydı; bunlar fiziksel
 mikrofon veya sıfırdan kurulum doğrulaması anlamına gelmez.
 
-## Önceki ASYA sürümü
-
-ASYA aynı repository ve Git geçmişiyle devam eder. Yeni uygulamanın kullanmadığı
-Streamlit/Ollama/Edge-TTS kök modülleri ve eski kurulum araçları kaldırılmıştır.
-[Önceki sürümün kaynakları ve README'si](https://github.com/emir01b/asya-ai-assistant/tree/9205f79c5a61d2745814dd105e0933270e73d2a2)
-Git geçmişinde bulunur. `images/resim1.png` ve `images/resim2.png` eski sürümün
-arşiv görselleridir. Eski SQLite konuşmalarını yeni şemaya aktaran dönüştürücü henüz yoktur.
-
 ## Lisans
 
 ASYA kaynakları [MIT](LICENSE) lisanslıdır. Chatterbox, Whisper, model ağırlıkları
