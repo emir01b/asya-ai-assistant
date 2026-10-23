@@ -7,9 +7,17 @@ ASYA'nın amacı Türkçe sesli sohbet, yerel LLM ve konuşma hafızasıdır.
 yeni uygulamasıdır. Aynı repository ve Git geçmişi üzerinde, mevcut sürümün
 yanına test edilebilir parçalar eklenerek ilerlenir.
 
-Bu belge bir geçiş planıdır. Aşağıdaki yeni backend, frontend ve ses özellikleri
-henüz bu repository'ye aktarılmamıştır; mevcut giriş noktası hâlâ
-`streamlit run main.py` komutudur.
+23 Ekim 2026 güncellemesi: React/FastAPI kaynakları, Windows başlatıcıları,
+testler ve OpenAPI sözleşmesi bu repository'ye aktarıldı. Yeni giriş noktası
+`scripts/start-app.ps1`; eski `streamlit run main.py` yolu korunuyor.
+Çalıştırma ve yerel ortam bağlantıları [ASYA rehberinde](VOICE_STUDIO.md).
+Aktarım Git geçmişini yeniden oluşturmaz; mevcut `evolution/voice-studio`
+dalındaki çalışma ağacına eklenmiştir.
+
+Aşağıdaki sıra ilk geçiş planıdır. Kaynak aktarımı, her satırdaki kabul ölçütünün
+tamamlandığı anlamına gelmez: eski konuşmaları dönüştürme, eski ayarları birleştirme
+ve temiz AI ortamı kurulumu hâlâ ayrı işlerdir. Tarihsel ölçüm raporları ve kişisel
+veriler aktarılmadı. Mevcut yerel runtime bağlantıları Git dışında tutulur.
 
 ## İncelenen başlangıç noktası
 
