@@ -47,3 +47,10 @@ data/
 
 # Locally provisioned upstream source; tracked changes belong in patches/
 /chatterbox/
+
+# Generated local verification reports and browser captures
+/docs/*-results.json
+/docs/thread-benchmark.json
+/docs/studio-*.png
+/docs/live-voice-chat.png
+/docs/streaming-speech-settings.png
