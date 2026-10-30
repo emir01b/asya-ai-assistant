@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎙️ ASYA
+# ASYA
 
 **Yerel çalışan, Türkçe destekli sesli yapay zekâ asistanı**
 
@@ -45,25 +45,42 @@ Kişisel konuşmalar veya ses kayıtları içermez; üretilmiş bir yanıt göst
 İfade ayarları model parametrelerini değiştirir; belirli bir duyguyu veya kahkaha/ağlama
 üretimini garanti etmez. Chatterbox her ses parçasını tamamladıktan sonra oynatma başlar.
 
-## Hızlı başlangıç
+## Kolay kurulum
 
-Mevcut Python/CUDA ortamı hazırlanmış bir Windows bilgisayarda, repo kökünden:
+İlk kez kullanıyorsanız proje klasöründeki **`kurulum.bat` dosyasını çift tıklayın**
+ve ekrandaki adımları izleyin.
+
+Kurucu sizin için:
+
+- Python 3.11, Node.js ve Git'in kurulu olup olmadığını kontrol eder; eksikler için indirme bağlantılarını gösterir.
+- Ekran kartınızı sorar ve seçiminize uygun NVIDIA/CUDA veya CPU paketlerini kurar.
+- Gerekli sanal ortamları oluşturur.
+- Torch, Chatterbox ve Whisper bağımlılıklarını yükler.
+- Ses modellerini indirir ve uygulama arayüzünü hazırlar.
+- Kısa bir Türkçe ses üretimi ve konuşma tanıma testi çalıştırır.
+
+**Mevcut sanal ortamlar varsa yedekleme seçeneği sunulur. Kayıtlı uygulama ayarları korunur.**
+
+> **Gereksinimler:** Windows, Python **3.11 x64**, Node.js **22.12 veya üzeri** ve Git.
+> İlk kurulum internet gerektirir. Tam kurulum için yaklaşık **7–10 GB indirme** ve
+> **25 GB boş disk alanı** planlayın.
+
+### Kurulumdan sonra
+
+Proje klasöründe PowerShell açıp uygulamayı başlatın:
 
 ```powershell
 .\scripts\start-app.ps1
 ```
 
-Tarayıcı: **http://127.0.0.1:8000**. LM Studio'da yerel API sunucusunu başlatın,
-bir sohbet modeli yükleyin ve ASYA'nın Ayarlar ekranından adres/model seçin.
+Tarayıcıdan **http://127.0.0.1:8000** adresini açın.
 
-Yeni kuruluma veya mevcut `voice-lab` ortamını bağlamaya başlamadan önce
-[Kurulum rehberini](KURULUM.md) okuyun. `pip install -r requirements.txt` tek başına
-CUDA, Chatterbox, model ağırlıkları ve frontend kurulumunu tamamlamaz.
+Sesli sohbet için ayrıca **LM Studio'nun yerel API sunucusunu başlatın**, bir sohbet
+modeli yükleyin ve ASYA'nın **Ayarlar** ekranından modelinizi seçin.
 
-> **Geçiş durumu:** Yeni sürüm `evolution/voice-studio` dalına parça parça
-> aktarılıyor. Frontend ve başlatıcılar ayrı commitlerdir; bu komutlar ilgili
-> dosyaların bulunduğu tam çalışma kopyası içindir. Sıfırdan temiz AI ortamı
-> kurulumu henüz doğrulanmış değildir.
+Ayrıntılar ve sorun giderme için [Kurulum rehberine](KURULUM.md) bakın.
+
+> Otomatik kurulumun tüm donanımlarda canlı doğrulaması henüz tamamlanmadı.
 
 ## Mimari
 
@@ -90,11 +107,13 @@ data/               Yerel kullanıcı verileri ve modeller; Git dışında
 
 ## Gereksinimler ve kapsam
 
-- Windows üzerinde Python 3.11 ve Node.js >=22.12.0.
-- GPU kullanımı için uyumlu NVIDIA/CUDA/Torch ortamı. Mevcut doğrulama RTX 5060 Ti
+- Windows üzerinde Python 3.11 x64, Node.js >=22.12.0 ve Git.
+- NVIDIA GPU kullanımı için uyumlu kart ve NVIDIA sürücüsü. Kurucu seçiminize göre
+  CUDA destekli Torch paketlerini yükler. Mevcut doğrulama RTX 5060 Ti
   16 GB ve Torch 2.10.0+cu128 ortamında yapılmıştır; bu bir minimum donanım garantisi değildir.
+- AMD/Intel ekran kartlarında veya GPU kullanmadan CPU seçeneği kullanılabilir; daha yavaş çalışır.
 - Sesli asistan için çalışan LM Studio sunucusu ve yüklenmiş bir sohbet modeli.
-- Whisper için ana Python ortamından ayrı `.venv-stt` ortamı.
+- Whisper için ana Python ortamından ayrı `.venv-stt` ortamı; otomatik kurucu oluşturur.
 - LAN HTTPS kurulumu için PowerShell 7 ve istemci cihazında yerel CA güveni.
 
 Yeni sürümün macOS/Linux çalışması, fiziksel mikrofon/oda yankısı ve sıfırdan

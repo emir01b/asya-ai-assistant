@@ -1,5 +1,9 @@
-# ASYA API dependencies; not a complete speech/CUDA environment installer.
-# Provision the compatible Chatterbox/Torch environment first (see KURULUM.md).
-# Install STT dependencies separately in .venv-stt using
-# apps/backend/requirements-stt.txt; frontend dependencies use npm ci.
+# First-time Windows setup: kurulum.bat (Python 3.11 x64).
+# kurulum.ps1 prepares pinned ./chatterbox and installs the selected CPU/CUDA
+# Torch wheels first. API-only updates: apps/backend/requirements.txt.
 -r apps/backend/requirements.txt
+huggingface-hub>=1.4,<2
+torch==2.10.0
+torchaudio==2.10.0
+torchvision==0.25.0
+./chatterbox

@@ -7,6 +7,9 @@ Thumbs.db
 # Python environments and generated files
 .venv/
 .venv-stt/
+.venv.backup-*/
+.venv-stt.backup-*/
+.setup-tests/
 venv/
 __pycache__/
 *.py[cod]

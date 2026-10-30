@@ -43,14 +43,16 @@ Pop-Location
 
 Gereksinimler: Windows, Python 3.11, Node >=22.12.0 ve mevcut CUDA/Torch kurulumu.
 Backend ek paketleri `apps/backend/requirements.txt`, izole Whisper ortamı
-`apps/backend/requirements-stt.txt` içindedir. Bunlar tek başına sıfırdan AI
-ortamı kurma reçetesi değildir. Başka bir bilgisayarda temiz kurulum bu aktarımda
-doğrulanmadı; mevcut Torch/CUDA paketlerini topluca yükseltmeyin.
+`apps/backend/requirements-stt.txt` içindedir. Yeni bilgisayarda repo kökündeki
+`kurulum.bat` tüm kurulum adımlarını yürütür; kök `requirements.txt` ana ses
+bağımlılıklarını da kapsar. Mevcut çalışan Torch/CUDA ortamını topluca yükseltmek
+yerine kurucudaki yedekleyerek yeniden oluşturma seçeneğini kullanın.
 
 Chatterbox upstream commit'i `5de7a54aa4e5e2baadb0182dde554908b48b85c2`;
 yerel pyproject değişiklikleri `../patches/chatterbox-runtime.patch` dosyasında
 saklanır. Kullanılan Torch ve torchaudio 2.10.0'dır; CUDA kurulumu korunur.
-Bu kayıt tam bağımlılık kilidi veya otomatik kurulum scripti değildir.
+Bu tarihsel kayıt tam bağımlılık kilidi değildir. Sonradan eklenen otomatik temiz
+kurulum için repo kökündeki `kurulum.bat` ve [güncel rehberi](../KURULUM.md) kullanın.
 
 ## Kullanım
 
