@@ -17,6 +17,7 @@ import {
 } from "../components/ui";
 import type { Settings, LMStatus, Voice, SystemStatus } from "../types";
 import LanHttpsSetup from "../components/LanHttpsSetup";
+import AgentAccess from "../components/AgentAccess";
 
 export default function SettingsPage({
   initial,
@@ -73,6 +74,7 @@ export default function SettingsPage({
   return (
     <>
       <LanHttpsSetup network={network} />
+      <AgentAccess />
       <div className="settings-grid">
         <section className="panel padded">
           <h2>

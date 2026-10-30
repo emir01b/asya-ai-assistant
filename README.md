@@ -41,6 +41,7 @@ Kişisel konuşmalar veya ses kayıtları içermez; üretilmiş bir yanıt göst
 | Ses çıktıları | WAV/MP3 indirme, geçmişi dinleme ve karşılaştırma |
 | Tanılama | İş durumu, hata kayıtları ve GPU bilgileri |
 | Yerel ağ | İsteğe bağlı HTTPS ile aynı ağdaki cihazlardan erişim |
+| Ajan erişimi | API veya MCP üzerinden arayüzü kullanmadan ses üretimi |
 
 İfade ayarları model parametrelerini değiştirir; belirli bir duyguyu veya kahkaha/ağlama
 üretimini garanti etmez. Chatterbox her ses parçasını tamamladıktan sonra oynatma başlar.
@@ -82,6 +83,22 @@ Ayrıntılar ve sorun giderme için [Kurulum rehberine](KURULUM.md) bakın.
 
 > Otomatik kurulumun tüm donanımlarda canlı doğrulaması henüz tamamlanmadı.
 
+## Ajan erişimi
+
+OpenClaw gibi sistemlerdeki ajanlar, **API veya MCP üzerinden** ASYA'ya metin
+gönderip WAV veya MP3 ses dosyası alabilir.
+
+1. **Ayarlar > Ajan erişimi** bölümündeki **Kur** butonuna basın.
+   İlerleme ekranda gösterilir; kuruluysa **Zaten kurulu** yazar.
+2. Ajanınız için bir erişim anahtarı oluşturup ajanınıza tanımlayın.
+3. **Ajan erişimine izin ver** seçeneğini açın.
+
+Servis otomatik başlatılır; ayrıca terminal komutu çalıştırmanız gerekmez.
+**Erişim varsayılan olarak kapalıdır.** Kapattığınızda ajan işlemleri engellenir;
+yalnızca erişimin kapalı olduğunu bildiren bilgi adresi açık kalır.
+
+Bağlantı örnekleri için [Ajan API kılavuzuna](docs/AGENTS_API.md) bakın.
+
 ## Mimari
 
 ```text
@@ -99,6 +116,7 @@ Tarayıcı / React
 ```text
 apps/backend/       API, ses motorları, kalıcılık ve backend testleri
 apps/frontend/      ASYA arayüzü ve frontend/tarayıcı testleri
+apps/agents/        Ajan API'si, MCP bağlantısı ve erişim kontrolü
 scripts/            Başlatma, ortam kontrolü ve doğrulama araçları
 docs/               Mimari notları ve OpenAPI sözleşmesi
 images/             README ekran görüntüleri

@@ -24,21 +24,29 @@ from .network import NetworkAccess
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s %(message)s')
 log = logging.getLogger('asya')
 def create_app(store=None, provider=None, network=None):
+    manage_agent_runtime = store is None
     network = network or NetworkAccess.from_env()
     store = store or Store()
     engines = Engines(store, provider)
     lm = LMClient(store)
     chat = ChatService(store, lm, engines)
+    from apps.agents.installer import AgentRuntime
+    agent_runtime = AgentRuntime(data=store.root / 'agents')
 
     @asynccontextmanager
     async def lifespan(app):
         store.recover_jobs()
         engines.start()
+        if manage_agent_runtime:
+            agent_runtime.startup()
         log.info(json.dumps(dict(event='startup', data_dir=str(store.root))))
         yield
         await engines.close()
+        agent_runtime.close()
 
     app = FastAPI(title='ASYA', version='1.0.0', lifespan=lifespan)
+    from apps.agents.admin import router as agent_admin_router
+    app.include_router(agent_admin_router(store.root / 'agents', agent_runtime))
     app.state.store, app.state.engines, app.state.lm = store, engines, lm
     app.add_middleware(CORSMiddleware, allow_origins=sorted(network.origins),
                        allow_methods=['GET','POST','PUT','DELETE'], allow_headers=['Content-Type'])
