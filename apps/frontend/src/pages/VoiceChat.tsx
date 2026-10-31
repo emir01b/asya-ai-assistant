@@ -8,6 +8,7 @@ import {
   Trash2,
   Send,
   Volume2,
+  RefreshCw,
 } from "lucide-react";
 import { api, audioUrl, statusLabel, generateAudio } from "../api";
 import { IconButton, Tag, VoiceSelect, type Feedback } from "../components/ui";
@@ -18,6 +19,7 @@ import type {
   Voice,
   Job,
   SystemStatus,
+  LMStatus,
 } from "../types";
 import { AudioQueue, Microphone } from "../audio";
 import { requestId } from "../request-id";
@@ -39,6 +41,52 @@ export default function VoiceChat({
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
   const [voice, setVoice] = useState(settings?.default_voice || "");
+  const [model, setModel] = useState(settings?.llm_model || "");
+  const modelRef = useRef(model);
+  const modelChanged = useRef(false);
+  const [models, setModels] = useState<LMStatus["models"]>([]);
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [modelsError, setModelsError] = useState("");
+  const modelsRequest = useRef(0);
+  const modelsAbort = useRef<AbortController | null>(null);
+  useEffect(() => {
+    if (!modelChanged.current) {
+      modelRef.current = settings?.llm_model || "";
+      setModel(modelRef.current);
+    }
+  }, [settings?.llm_model]);
+  const loadModels = useCallback(async () => {
+    const generation = ++modelsRequest.current;
+    modelsAbort.current?.abort();
+    const controller = new AbortController();
+    modelsAbort.current = controller;
+    setModelsLoading(true);
+    setModelsError("");
+    try {
+      const result = await api<LMStatus>("/llm/models", {
+        signal: controller.signal,
+      });
+      if (generation !== modelsRequest.current) return;
+      if (!result.connected)
+        throw new Error(result.error || "LM Studio bağlantısı kurulamadı.");
+      setModels(result.models);
+    } catch (error) {
+      if (generation !== modelsRequest.current || controller.signal.aborted)
+        return;
+      setModelsError(
+        error instanceof Error ? error.message : "Modeller alınamadı.",
+      );
+    } finally {
+      if (generation === modelsRequest.current) setModelsLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    void loadModels();
+    return () => {
+      modelsRequest.current++;
+      modelsAbort.current?.abort();
+    };
+  }, [loadModels]);
   const [state, setState] = useState("idle");
   const [connected, setConnected] = useState(false);
   const [listening, setListening] = useState(false);
@@ -282,6 +330,7 @@ export default function VoiceChat({
         conversation_id: session.current,
         voice_id: voiceRef.current || null,
         speak: speakRef.current,
+        model: modelRef.current || null,
       }),
     );
     setText("");
@@ -420,6 +469,48 @@ export default function VoiceChat({
             <Tag good={connected}>
               {connected ? "Sohbet bağlı" : "Bağlı değil"}
             </Tag>
+            <div className="chat-model-picker">
+              <div className="chat-model-controls">
+                <select
+                  aria-label="Sohbet modeli"
+                  value={model}
+                  onChange={(e) => {
+                    modelChanged.current = true;
+                    modelRef.current = e.target.value;
+                    setModel(e.target.value);
+                  }}
+                >
+                  <option value="">Model seçin</option>
+                  {model && !models.some((item) => item.id === model) && (
+                    <option value={model}>{model} (listede yok)</option>
+                  )}
+                  {models.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.id}
+                    </option>
+                  ))}
+                </select>
+                <IconButton
+                  label="Modelleri yenile"
+                  onClick={() => void loadModels()}
+                >
+                  <RefreshCw size={14} />
+                </IconButton>
+              </div>
+              <span
+                className="muted chat-model-status"
+                role="status"
+                aria-live="polite"
+              >
+                {modelsLoading
+                  ? "Modeller yükleniyor…"
+                  : modelsError
+                    ? `Modeller alınamadı: ${modelsError}`
+                    : !models.length
+                      ? "LM Studio model listesi boş. Bir model yükleyip yenileyin."
+                      : "Seçiminiz sonraki mesajda kullanılır."}
+              </span>
+            </div>
             <VoiceSelect voices={voices} value={voice} onChange={setVoice} />
             <label className="checkbox">
               <input
@@ -454,8 +545,9 @@ export default function VoiceChat({
                   Konuşmanız bittiğinde yanıt otomatik hazırlanır.
                 </p>
                 <span className="muted">
-                  {settings?.llm_model ||
-                    "Önce Ayarlar’dan bir LM Studio modeli seçin."}
+                  {model
+                    ? `Sohbet modeli: ${model}. Yukarıdaki seçiciden değiştirebilirsiniz.`
+                    : "Yukarıdaki Sohbet modeli seçicisinden bir LM Studio modeli seçin."}
                 </span>
               </div>
             )}
