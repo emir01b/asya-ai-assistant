@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Plus,
   Upload,
@@ -11,6 +11,8 @@ import { api, audioUrl } from "../api";
 import { Tag, IconButton, Empty, type Feedback } from "../components/ui";
 import type { Voice, Settings } from "../types";
 import { languageNames } from "../catalog";
+import ReferenceEditor from "../components/ReferenceEditor";
+import { readAudioDuration, referenceFileError } from "../voiceReference";
 
 export default function Library({
   voices,
@@ -29,6 +31,35 @@ export default function Library({
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [trimming, setTrimming] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const fileChoice = useRef(0);
+  async function chooseFile(selected: File | null) {
+    const choice = ++fileChoice.current;
+    setFile(null);
+    setFileError(null);
+    setChecking(false);
+    if (!selected) return;
+    const sizeError = referenceFileError(selected.size);
+    if (sizeError) {
+      setFileError(sizeError);
+      return;
+    }
+    setChecking(true);
+    try {
+      const duration = await readAudioDuration(selected);
+      if (choice !== fileChoice.current) return;
+      const error = referenceFileError(selected.size, duration);
+      setFileError(error);
+      if (!error) setFile(selected);
+    } catch (e) {
+      if (choice === fileChoice.current)
+        setFileError(e instanceof Error ? e.message : String(e));
+    } finally {
+      if (choice === fileChoice.current) setChecking(false);
+    }
+  }
   async function upload() {
     if (!file || !name.trim() || !consent) {
       fail(new Error("Ad, referans dosyası ve kullanım izni gerekli."));
@@ -41,11 +72,15 @@ export default function Library({
     form.append("consent", "true");
     form.append("language", "tr");
     try {
-      await api("/voices", { method: "POST", body: form });
+      const created = await api<Voice>("/voices", {
+        method: "POST",
+        body: form,
+      });
       setName("");
       setFile(null);
       setConsent(false);
       await refresh();
+      setTrimming(created.id);
       notify("Ses profili kaydedildi.");
     } catch (e) {
       fail(e);
@@ -61,7 +96,9 @@ export default function Library({
             <Plus size={18} />
             Yeni ses profili
           </h2>
-          <span className="muted">0,25–60 saniye · En fazla 25 MB</span>
+          <span className="muted">
+            En fazla 5 dakika · 200 MB · Önerilen klip 6–10 sn
+          </span>
         </div>
         <div className="two-cols">
           <div>
@@ -81,9 +118,24 @@ export default function Library({
                 aria-label="Referans ses dosyası"
                 type="file"
                 accept="audio/*,video/mp4"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                onChange={(e) => void chooseFile(e.target.files?.[0] || null)}
               />
             </label>
+            {checking && (
+              <p className="help-text" role="status">
+                Dosyanın süresi kontrol ediliyor…
+              </p>
+            )}
+            {fileError && (
+              <p className="error-text" role="alert">
+                {fileError}
+              </p>
+            )}
+            <p className="help-text">
+              Orijinal dosya korunur. Yeni yüklemelerde temiz bir referans klibi
+              önerilir; başlangıç ve bitişi dinleyerek düzenleyebilirsiniz.
+              Mevcut profiller otomatik değiştirilmez.
+            </p>
           </div>
           <div className="consent-card">
             <ShieldCheck size={25} />
@@ -102,7 +154,7 @@ export default function Library({
             </label>
             <button
               className="button primary"
-              disabled={busy || !file || !name.trim() || !consent}
+              disabled={busy || checking || !file || !name.trim() || !consent}
               onClick={() => void upload()}
             >
               {busy ? (
@@ -167,8 +219,44 @@ export default function Library({
               {languageNames[v.language]} · {v.duration.toFixed(1)} sn ·{" "}
               {v.sample_rate / 1000} kHz
             </p>
-            <audio controls src={audioUrl(v.asset_id)} />
+            <p className="help-text">Kullanılan referans klibi</p>
+            <audio
+              controls
+              aria-label={`${v.name} referansı`}
+              src={audioUrl(v.reference_asset_id || v.asset_id)}
+            />
+            {!!v.warnings?.length && (
+              <ul className="help-text" aria-label="Referans kalite uyarıları">
+                {v.warnings.map((warning, index) => (
+                  <li key={index}>{warning}</li>
+                ))}
+              </ul>
+            )}
+            <a
+              className="text-link"
+              href={audioUrl(v.asset_id)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Tam kaydı dinle
+            </a>
+            {v.original_asset_id && (
+              <a
+                className="text-link"
+                style={{ marginLeft: 12 }}
+                href={audioUrl(v.original_asset_id)}
+                download
+              >
+                Orijinal dosyayı indir
+              </a>
+            )}
             <div className="voice-actions">
+              <button
+                className="text-link"
+                onClick={() => setTrimming(trimming === v.id ? null : v.id)}
+              >
+                Referans klibini düzenle
+              </button>
               <button
                 className="text-link"
                 onClick={() => {
@@ -203,6 +291,15 @@ export default function Library({
                 <Trash2 size={15} />
               </IconButton>
             </div>
+            {trimming === v.id && (
+              <ReferenceEditor
+                voice={v}
+                refresh={refresh}
+                fail={fail}
+                notify={notify}
+                close={() => setTrimming(null)}
+              />
+            )}
           </article>
         ))}
       </div>

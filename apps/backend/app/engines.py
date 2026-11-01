@@ -5,6 +5,9 @@ import copy
 import gc
 import json
 import os
+import secrets
+import re
+from difflib import SequenceMatcher
 import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -15,14 +18,15 @@ import numpy as np
 import soundfile as sf
 
 from .core import ROOT, now, uid
-from .llm import split_sentences, speech_text
+from .llm import speech_text, split_sentences
+from .streaming_speech import SpeechChunker
 from .providers import ProviderRegistry, ProviderRegistration
 from .audio import pace_audio
 
 
 class TTSProvider(Protocol):
     def load(self, settings: dict): ...
-    def generate(self, text: str, language: str, reference: str | None, exaggeration: float, cfg_weight: float): ...
+    def generate(self, text: str, language: str, reference: str | None, exaggeration: float, cfg_weight: float, seed: int | None = None): ...
     def unload(self): ...
 
 
@@ -57,8 +61,12 @@ class ChatterboxProvider:
         self.default_conditions = copy.deepcopy(self.model.conds)
         self.load_seconds = time.perf_counter() - start
 
-    def generate(self, text, language, reference, exaggeration, cfg_weight):
+    def generate(self, text, language, reference, exaggeration, cfg_weight, seed=None):
         import torch
+        if seed is not None:
+            torch.manual_seed(seed)
+            if self.device == 'cuda':
+                torch.cuda.manual_seed_all(seed)
         if self.device == 'cuda':
             torch.cuda.reset_peak_memory_stats()
         started = time.perf_counter()
@@ -81,6 +89,16 @@ class ChatterboxProvider:
         elapsed = time.perf_counter() - started
         peak = torch.cuda.max_memory_allocated() / 1048576 if self.device == 'cuda' else None
         return wav.squeeze().cpu().numpy(), self.model.sr, elapsed, peak
+
+    def speaker_similarity(self, reference, generated):
+        import librosa
+        if not reference:
+            return None
+        wavs = [librosa.load(str(path), sr=16000, mono=True)[0] for path in (reference, generated)]
+        embeddings = self.model.ve.embeds_from_wavs(wavs, sample_rate=16000)
+        left, right = np.asarray(embeddings[0]), np.asarray(embeddings[1])
+        denom = np.linalg.norm(left) * np.linalg.norm(right)
+        return float(np.dot(left, right) / denom) if denom else None
 
     def unload(self):
         self.model = None
@@ -191,17 +209,32 @@ class Engines:
         if not registration or not registration.factory:
             raise ValueError('Bu TTS provider kurulu ve doğrulanmış değil.')
         if values.pop('normalize', False):
-            values['text'] = speech_text(values['text'])
+            values['text'] = speech_text(values['text'], values.get('language', 'tr'))
             if not values['text'].strip():
                 raise ValueError('Seslendirilecek konuşma metni bulunamadı.')
-        voice_id = values.get('voice_id') or self.store.settings()['default_voice']
+        settings = self.store.settings()
+        voice_id = values.get('voice_id') if values.pop('voice_id_resolved', False) else (values.get('voice_id') or settings['default_voice'])
         reference = None
+        reference_asset_id = None
+        voice = {}
         if voice_id:
             voice = self.store.get('voice', voice_id)
             if not voice or not voice['consent']:
                 raise ValueError('Ses profili bulunamadı veya kullanım izni yok.')
-            reference = str(self.store.asset(voice['asset_id']))
-        values.update(voice_id=voice_id or None, reference=reference)
+            reference_asset_id = voice.get('reference_asset_id') or voice['asset_id']
+            reference = str(self.store.asset(reference_asset_id))
+        for name in ('exaggeration', 'cfg_weight'):
+            if values.get(name) is None:
+                values[name] = voice.get(name) if voice.get(name) is not None else .5
+        values['speech_quality'] = values.get('speech_quality') or settings.get('speech_quality', 'balanced')
+        if values.get('compare_candidates') is None:
+            values['compare_candidates'] = settings.get('compare_candidates', False)
+        if values.get('seed') is None:
+            values['seed'] = secrets.randbelow(2**31 - 1)
+        values.update(voice_id=voice_id or None, reference=reference, reference_asset_id=reference_asset_id,
+                      model='Chatterbox Multilingual V3', voice_snapshot={k: voice.get(k) for k in
+                          ('name', 'exaggeration', 'cfg_weight', 'reference_start', 'reference_end',
+                           'reference_start_seconds', 'reference_end_seconds', 'asset_id', 'reference_asset_id')} if voice else None)
         job = self.store.put('job', {**values, 'status':'queued','progress':0,'segments':[],
                                    'error':None,'metrics':{},'asset_id':None})
         self.queue.put_nowait(job['id'])
@@ -264,43 +297,143 @@ class Engines:
             self.provider_id = job['provider']
         await self.blocking(self.provider.load, self.store.settings())
         job = self.store.get('job', key)
-        parts = split_sentences(job['text'], min_chars=job.get('min_segment_chars',0))
-        chunks, segments, peak_mb = [], [], None
-        synthesis = 0
-        for index, part in enumerate(parts):
-            if self.store.get('job', key)['status'] == 'cancelling':
-                self.update(key, status='cancelled')
-                return
-            samples, sr, elapsed, peak = await self.blocking(self.provider.generate, part,
-                job['language'], job['reference'], job['exaggeration'], job['cfg_weight'])
-            if job.get('speech_rate', 1.0) != 1.0 or job.get('trailing_pause_ms', 0):
-                samples = await asyncio.to_thread(pace_audio, samples, sr,
-                    job.get('speech_rate', 1.0), job.get('trailing_pause_ms', 0))
-            if self.store.get('job', key)['status'] == 'cancelling':
-                self.update(key, status='cancelled')
-                return
-            path = self.store.root / 'generations' / f'{key}-{index}.wav'
-            await asyncio.to_thread(sf.write, str(path), samples, sr, subtype='PCM_16')
-            asset = self.store.add_asset(path, duration=len(samples)/sr, sample_rate=sr)
-            segment = dict(index=index, text=part, asset_id=asset['id'], duration=len(samples)/sr,
-                           generation_seconds=elapsed, ready_seconds=time.perf_counter()-started)
-            segments.append(segment)
-            chunks.extend([samples, np.zeros(0 if job.get('trailing_pause_ms') else int(sr * .16), dtype=np.float32)])
-            synthesis += elapsed
-            peak_mb = max(peak_mb or 0, peak or 0) or None
-            self.update(key, progress=(index+1)/len(parts), segments=list(segments))
-        path = self.store.root / 'generations' / f'{key}.wav'
-        audio = np.concatenate(chunks[:-1])
-        await asyncio.to_thread(sf.write, str(path), audio, sr, subtype='PCM_16')
-        duration = len(audio)/sr
-        asset = self.store.add_asset(path, duration=duration, sample_rate=sr)
+        chunker = SpeechChunker(job.get('speech_quality', 'balanced'))
+        parts = ([job['text']] if job.get('presegmented') and len(job['text']) <= 240 else
+                 split_sentences(job['text'], min_chars=job['min_segment_chars']) if job.get('min_segment_chars') else
+                 chunker.feed(job['text'] + ' ') + chunker.finish())
+        candidates = []
+        all_artifacts = []
+        def cleanup_artifacts(artifacts):
+            for asset_id, path in artifacts:
+                if asset_id:
+                    self.store.delete('asset', asset_id)
+                path.unlink(missing_ok=True)
+            artifacts.clear()
+
+        def cancel_generation():
+            cleanup_artifacts(all_artifacts)
+            self.update(key, status='cancelled', segments=[], candidates=[], asset_id=None)
+        candidate_errors = []
+        total_candidates = 2 if job.get('compare_candidates') else 1
+        for candidate_index in range(total_candidates):
+            artifacts = []
+            def cleanup_candidate():
+                cleanup_artifacts(artifacts)
+            try:
+                chunks, segments, peak_mb = [], [], None
+                synthesis = 0
+                candidate_seed = (job['seed'] + candidate_index) % (2**32)
+                for index, part in enumerate(parts):
+                    if self.store.get('job', key)['status'] in ('cancelling', 'cancelled'):
+                        cleanup_candidate()
+                        cancel_generation()
+                        return
+                    samples, sr, elapsed, peak = await self.blocking(self.provider.generate, part,
+                        job['language'], job['reference'], job['exaggeration'], job['cfg_weight'],
+                        (candidate_seed + index) % (2**32))
+                    samples = np.asarray(samples)
+                    if not samples.size or samples.ndim != 1 or not np.isfinite(samples).all() or np.max(np.abs(samples)) < 1e-6 or sr <= 0:
+                        raise ValueError('TTS geçersiz ses üretti.')
+                    if job.get('speech_rate', 1.0) != 1.0 or job.get('trailing_pause_ms', 0):
+                        samples = await asyncio.to_thread(pace_audio, samples, sr,
+                            job.get('speech_rate', 1.0), job.get('trailing_pause_ms', 0))
+                    if self.store.get('job', key)['status'] in ('cancelling', 'cancelled'):
+                        cleanup_candidate()
+                        cancel_generation()
+                        return
+                    path = self.store.root / 'generations' / f'{key}-{candidate_index}-{index}.wav'
+                    artifacts.append((None, path))
+                    await asyncio.to_thread(sf.write, str(path), samples, sr, subtype='PCM_16')
+                    asset = self.store.add_asset(path, duration=len(samples)/sr, sample_rate=sr)
+                    artifacts[-1] = (asset['id'], path)
+                    if self.store.get('job', key)['status'] in ('cancelling', 'cancelled'):
+                        cleanup_candidate()
+                        cancel_generation()
+                        return
+                    segment = dict(index=index, text=part, asset_id=asset['id'], duration=len(samples)/sr,
+                                   generation_seconds=elapsed, ready_seconds=time.perf_counter()-started)
+                    segments.append(segment)
+                    chunks.extend([samples, np.zeros(0 if job.get('trailing_pause_ms') else int(sr * .16), dtype=np.float32)])
+                    synthesis += elapsed
+                    peak_mb = max(peak_mb or 0, peak or 0) or None
+                    # Compared candidates cannot stream until the winner is known.
+                    self.update(key, progress=(candidate_index + (index+1)/len(parts))/total_candidates,
+                                segments=list(segments) if total_candidates == 1 else [])
+                path = self.store.root / 'generations' / f'{key}-candidate-{candidate_index}.wav'
+                audio = np.concatenate(chunks[:-1])
+                artifacts.append((None, path))
+                await asyncio.to_thread(sf.write, str(path), audio, sr, subtype='PCM_16')
+                duration = len(audio)/sr
+                asset = self.store.add_asset(path, duration=duration, sample_rate=sr)
+                artifacts[-1] = (asset['id'], path)
+                if self.store.get('job', key)['status'] in ('cancelling', 'cancelled'):
+                    cleanup_candidate()
+                    cancel_generation()
+                    return
+                metrics = dict(total_seconds=time.perf_counter()-started, synthesis_seconds=synthesis, duration=duration,
+                               first_audio_seconds=segments[0]['ready_seconds'], rtf=synthesis/duration,
+                               peak_vram_mb=peak_mb, model_load_seconds=self.provider.load_seconds,
+                               queue_seconds=queue_seconds)
+                candidates.append(dict(index=len(candidates), seed=candidate_seed, asset_id=asset['id'],
+                                       segments=segments, metrics=metrics, scoring=None))
+                all_artifacts.extend(artifacts)
+                artifacts.clear()
+                self.update(key, candidates=list(candidates))
+            except Exception as exc:
+                cleanup_candidate()
+                candidate_errors.append(dict(seed=(job['seed'] + candidate_index) % (2**32), error=str(exc)))
+                self.update(key, candidate_errors=list(candidate_errors))
+                if 'out of memory' in str(exc).lower():
+                    await self.blocking(self.provider.unload)
+                    if candidate_index + 1 < total_candidates:
+                        await self.blocking(self.provider.load, self.store.settings())
+                if total_candidates == 1:
+                    self.update(key, segments=[])
+                    raise
+        if not candidates:
+            raise ValueError('Hiçbir aday üretilemedi: ' + '; '.join(e['error'] for e in candidate_errors))
+        selected = 0
+        if len(candidates) == 2:
+            for candidate in candidates:
+                if self.store.get('job', key)['status'] in ('cancelling', 'cancelled'):
+                    cancel_generation()
+                    return
+                try:
+                    result = await self._transcribe_locked(self.store.asset(candidate['asset_id']), job['language'])
+                    expected = re.findall(r'\w+', speech_text(job['text'], job['language']).casefold())
+                    actual = re.findall(r'\w+', speech_text(result['text'], job['language']).casefold())
+                    fidelity = SequenceMatcher(None, expected, actual).ratio()
+                    similarity = None
+                    if job['reference'] and hasattr(self.provider, 'speaker_similarity'):
+                        try:
+                            similarity = await self.blocking(self.provider.speaker_similarity, job['reference'],
+                                                             self.store.asset(candidate['asset_id']))
+                        except Exception as exc:
+                            self.store.error('speaker_similarity', str(exc))
+                    candidate['scoring'] = dict(transcript=result['text'], fidelity=fidelity, speaker_similarity=similarity)
+                except Exception as exc:
+                    candidate['scoring'] = dict(error=str(exc), fidelity=None, speaker_similarity=None)
+                self.update(key, candidates=list(candidates))
+            if all(c['scoring'].get('fidelity') is not None for c in candidates):
+                selected = max(range(len(candidates)), key=lambda i: (candidates[i]['scoring']['fidelity'],
+                    candidates[i]['scoring'].get('speaker_similarity') if candidates[i]['scoring'].get('speaker_similarity') is not None else -2))
+        if self.store.get('job', key)['status'] in ('cancelling', 'cancelled'):
+            cancel_generation()
+            return
+        winner = candidates[selected]
         total = time.perf_counter()-started
+        if total_candidates == 2:
+            metrics = dict(winner['metrics'])
+            metrics['first_audio_seconds'] = total
+            metrics['total_seconds'] = total
+            metrics['synthesis_seconds'] = sum(c['metrics']['synthesis_seconds'] for c in candidates)
+            metrics['rtf'] = metrics['synthesis_seconds'] / metrics['duration']
+            metrics['peak_vram_mb'] = max((c['metrics']['peak_vram_mb'] or 0 for c in candidates), default=0) or None
+        else:
+            metrics = winner['metrics']
         self.last_seconds = total
-        metrics = dict(total_seconds=total, synthesis_seconds=synthesis, duration=duration,
-                       first_audio_seconds=segments[0]['ready_seconds'], rtf=synthesis/duration,
-                       peak_vram_mb=peak_mb, model_load_seconds=self.provider.load_seconds,
-                       queue_seconds=queue_seconds)
-        self.update(key, status='completed', progress=1, asset_id=asset['id'], metrics=metrics)
+        self.update(key, status='completed', progress=1, asset_id=winner['asset_id'], segments=winner['segments'],
+                    candidates=candidates, selected_candidate=selected, metrics=metrics)
         self.store.put('benchmark', dict(source='tts', job_id=key, **metrics))
 
     async def wait_job(self, key):
@@ -311,49 +444,55 @@ class Engines:
             await asyncio.sleep(.05)
 
     async def transcribe(self, path: Path, language: str | None):
+        if self.gpu_lock.locked():
+            self.stt_state['waiting'] = True
+        async with self.gpu_lock:
+            return await self._transcribe_locked(path, language)
+
+    async def _transcribe_locked(self, path: Path, language: str | None):
         settings = self.store.settings()
         python = ROOT / '.venv-stt' / 'Scripts' / 'python.exe'
         if not python.is_file():
             raise ValueError('STT ortamı kurulu değil. scripts/setup-stt.ps1 çalıştırın.')
-        if self.gpu_lock.locked():
-            self.stt_state['waiting'] = True
-        async with self.gpu_lock:
+        previous_active = self.active
+        if previous_active is None:
             self.active = 'stt'
-            self.stt_state['waiting'] = False
+        self.stt_state['waiting'] = False
+        try:
+            if not self.stt_process or self.stt_process.poll() is not None:
+                await self.unload_stt()
+                self.stt_log = (self.store.root/'stt-worker.log').open('ab')
+                self.stt_process = subprocess.Popen([str(python), '-u',
+                    str(ROOT/'apps/backend/stt_worker.py'), '--serve'], stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE, stderr=self.stt_log,
+                    creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+            params = dict(path=str(path), model_name=settings['stt_model'], device=settings['stt_device'],
+                          language=language or 'auto', offline='1' if settings['offline'] else '0',
+                          fallback='1' if settings['stt_cpu_fallback'] else '0')
             try:
-                if not self.stt_process or self.stt_process.poll() is not None:
-                    await self.unload_stt()
-                    self.stt_log = (self.store.root/'stt-worker.log').open('ab')
-                    self.stt_process = subprocess.Popen([str(python), '-u',
-                        str(ROOT/'apps/backend/stt_worker.py'), '--serve'], stdin=subprocess.PIPE,
-                        stdout=subprocess.PIPE, stderr=self.stt_log,
-                        creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
-                params = dict(path=str(path), model_name=settings['stt_model'], device=settings['stt_device'],
-                              language=language or 'auto', offline='1' if settings['offline'] else '0',
-                              fallback='1' if settings['stt_cpu_fallback'] else '0')
-                try:
-                    stdout = await asyncio.wait_for(asyncio.to_thread(self.stt_exchange, params), timeout=300)
-                except (asyncio.TimeoutError, asyncio.CancelledError):
-                    await self.unload_stt(force=True)
-                    raise
-                if not stdout:
-                    await self.unload_stt()
-                    details = (self.store.root/'stt-worker.log').read_text(errors='replace')[-1500:]
-                    raise ValueError('STT worker durdu: ' + details)
-                result = json.loads(stdout.decode('utf-8'))
-                if result.get('error'):
-                    raise ValueError(result['error'])
-                self.stt_state.update(loaded=True, device=result['device'], error=None,
-                                      last_seconds=result['seconds'], warning=result.get('warning'))
-                self.store.put('benchmark', dict(source='stt', **result))
-                return result
-            except Exception as exc:
-                message = str(exc) or type(exc).__name__
-                self.stt_state['error'] = message
-                self.store.error('stt', message)
-                raise ValueError(message) from exc
-            finally:
-                self.active = None
+                stdout = await asyncio.wait_for(asyncio.to_thread(self.stt_exchange, params), timeout=300)
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                await self.unload_stt(force=True)
+                raise
+            if not stdout:
+                await self.unload_stt()
+                details = (self.store.root/'stt-worker.log').read_text(errors='replace')[-1500:]
+                raise ValueError('STT worker durdu: ' + details)
+            result = json.loads(stdout.decode('utf-8'))
+            if result.get('error'):
+                raise ValueError(result['error'])
+            self.stt_state.update(loaded=True, device=result['device'], error=None,
+                                  last_seconds=result['seconds'], warning=result.get('warning'))
+            self.store.put('benchmark', dict(source='stt', **result))
+            return result
+        except Exception as exc:
+            message = str(exc) or type(exc).__name__
+            self.stt_state['error'] = message
+            self.store.error('stt', message)
+            raise ValueError(message) from exc
+        finally:
+            self.active = previous_active
+
 
     def status(self):
         return dict(provider=self.provider_id, loaded=self.provider.model is not None,

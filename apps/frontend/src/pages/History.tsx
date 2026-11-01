@@ -10,6 +10,7 @@ import {
 } from "../components/ui";
 import type { Voice, Job } from "../types";
 import { languageNames } from "../catalog";
+import GenerationDetails from "../components/GenerationDetails";
 
 export default function History({
   voices,
@@ -83,6 +84,17 @@ export default function History({
                 · İfade {j.exaggeration} · CFG {j.cfg_weight}
               </p>
               {j.asset_id && <audio controls src={audioUrl(j.asset_id)} />}
+              <GenerationDetails
+                job={j}
+                fail={fail}
+                onSelect={(updated) =>
+                  setJobs((items) =>
+                    items.map((item) =>
+                      item.id === updated.id ? updated : item,
+                    ),
+                  )
+                }
+              />
               <div className="history-actions">
                 <span>
                   {seconds(j.metrics.duration)} ses ·{" "}

@@ -1034,12 +1034,31 @@ footer i {
 }
 .voice-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 10px;
   align-items: center;
   margin-top: 15px;
   padding-top: 12px;
   border-top: 1px solid var(--border);
+}
+.reference-editor {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.reference-editor .two-cols {
+  gap: 10px;
+}
+.reference-editor label {
+  min-width: 0;
+}
+.generation-details {
+  margin: 14px 0;
+  overflow-wrap: anywhere;
+}
+.generation-details .panel {
+  margin-top: 14px;
 }
 .toolbar {
   display: flex;

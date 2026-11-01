@@ -4,6 +4,92 @@
  */
 
 export interface paths {
+    "/api/v1/agent-admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** State */
+        get: operations["state_api_v1_agent_admin_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-admin/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Access */
+        put: operations["access_api_v1_agent_admin_access_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-admin/installation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Installation */
+        get: operations["installation_api_v1_agent_admin_installation_get"];
+        put?: never;
+        /** Install */
+        post: operations["install_api_v1_agent_admin_installation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-admin/keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create */
+        post: operations["create_api_v1_agent_admin_keys_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-admin/keys/{identity}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke */
+        delete: operations["revoke_api_v1_agent_admin_keys__identity__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -186,6 +272,23 @@ export interface paths {
         get: operations["history_api_v1_tts_history_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tts/history/{key}/select-candidate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Select Candidate */
+        post: operations["select_candidate_api_v1_tts_history__key__select_candidate_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -456,6 +559,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Access */
+        Access: {
+            /** Enabled */
+            enabled: boolean;
+        };
         /** Body_create_voice_api_v1_voices_post */
         Body_create_voice_api_v1_voices_post: {
             /** File */
@@ -484,6 +592,42 @@ export interface components {
              * @default tr
              */
             language: string;
+        };
+        /** Candidate */
+        Candidate: {
+            /** Index */
+            index: number;
+            /** Seed */
+            seed: number;
+            /** Asset Id */
+            asset_id: string;
+            /** Segments */
+            segments: components["schemas"]["Segment"][];
+            metrics: components["schemas"]["Metrics"];
+            scoring?: components["schemas"]["CandidateScoring"] | null;
+        };
+        /** CandidateError */
+        CandidateError: {
+            /** Seed */
+            seed: number;
+            /** Error */
+            error: string;
+        };
+        /** CandidateScoring */
+        CandidateScoring: {
+            /** Transcript */
+            transcript?: string | null;
+            /** Fidelity */
+            fidelity?: number | null;
+            /** Speaker Similarity */
+            speaker_similarity?: number | null;
+            /** Error */
+            error?: string | null;
+        };
+        /** CandidateSelection */
+        CandidateSelection: {
+            /** Index */
+            index: number;
         };
         /** Chat */
         Chat: {
@@ -520,16 +664,16 @@ export interface components {
              * @default tr
              */
             language: string;
-            /**
-             * Exaggeration
-             * @default 0.5
-             */
-            exaggeration: number;
-            /**
-             * Cfg Weight
-             * @default 0.5
-             */
-            cfg_weight: number;
+            /** Exaggeration */
+            exaggeration?: number | null;
+            /** Cfg Weight */
+            cfg_weight?: number | null;
+            /** Speech Quality */
+            speech_quality?: ("fast" | "balanced" | "quality") | null;
+            /** Compare Candidates */
+            compare_candidates?: boolean | null;
+            /** Seed */
+            seed?: number | null;
             /**
              * Provider
              * @default chatterbox
@@ -603,6 +747,30 @@ export interface components {
             metrics: components["schemas"]["Metrics"];
             /** Asset Id */
             asset_id: string | null;
+            /** Reference Asset Id */
+            reference_asset_id?: string | null;
+            /**
+             * Speech Quality
+             * @default balanced
+             * @enum {string}
+             */
+            speech_quality: "fast" | "balanced" | "quality";
+            /**
+             * Compare Candidates
+             * @default false
+             */
+            compare_candidates: boolean;
+            /** Seed */
+            seed?: number | null;
+            /** Model */
+            model?: string | null;
+            voice_snapshot?: components["schemas"]["VoiceSnapshot"] | null;
+            /** Candidates */
+            candidates?: components["schemas"]["Candidate"][];
+            /** Candidate Errors */
+            candidate_errors?: components["schemas"]["CandidateError"][];
+            /** Selected Candidate */
+            selected_candidate?: number | null;
         };
         /** Metrics */
         Metrics: {
@@ -622,6 +790,18 @@ export interface components {
             model_load_seconds?: number | null;
             /** Queue Seconds */
             queue_seconds?: number | null;
+        };
+        /** NewAgent */
+        NewAgent: {
+            /** Name */
+            name: string;
+            /** Scopes */
+            scopes?: string[];
+            /**
+             * Voice
+             * @default asya-default
+             */
+            voice: string;
         };
         /** Segment */
         Segment: {
@@ -660,6 +840,17 @@ export interface components {
              * @default Türkçe konuşan, sıcak ve dikkatli bir asistansın. Kullanıcının sorusuna doğrudan cevap ver; kısa sorulara kısa, ayrıntı istenince yeterince açıklayıcı yanıtlar ver. Bilmediğin konularda tahminini gerçek gibi sunma. Doğal konuşma dili ve anlaşılır cümleler kullan.
              */
             system_prompt: string;
+            /**
+             * Speech Quality
+             * @default balanced
+             * @enum {string}
+             */
+            speech_quality: "fast" | "balanced" | "quality";
+            /**
+             * Compare Candidates
+             * @default false
+             */
+            compare_candidates: boolean;
             /**
              * Chat Speech Rate
              * @default 0.9
@@ -751,6 +942,16 @@ export interface components {
             language: string;
             /** Asset Id */
             asset_id: string;
+            /** Reference Asset Id */
+            reference_asset_id?: string | null;
+            /** Original Asset Id */
+            original_asset_id?: string | null;
+            /** Reference Start */
+            reference_start?: number | null;
+            /** Reference End */
+            reference_end?: number | null;
+            /** Warnings */
+            warnings?: string[];
             /** Duration */
             duration: number;
             /** Sample Rate */
@@ -763,6 +964,23 @@ export interface components {
             cfg_weight: number;
             /** Created At */
             created_at: string;
+        };
+        /** VoiceSnapshot */
+        VoiceSnapshot: {
+            /** Name */
+            name?: string | null;
+            /** Exaggeration */
+            exaggeration?: number | null;
+            /** Cfg Weight */
+            cfg_weight?: number | null;
+            /** Reference Start */
+            reference_start?: number | null;
+            /** Reference End */
+            reference_end?: number | null;
+            /** Asset Id */
+            asset_id?: string | null;
+            /** Reference Asset Id */
+            reference_asset_id?: string | null;
         };
         /** VoiceUpdate */
         VoiceUpdate: {
@@ -783,6 +1001,10 @@ export interface components {
              * @default 0.5
              */
             cfg_weight: number;
+            /** Reference Start */
+            reference_start?: number | null;
+            /** Reference End */
+            reference_end?: number | null;
         };
     };
     responses: never;
@@ -793,6 +1015,163 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    state_api_v1_agent_admin_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    access_api_v1_agent_admin_access_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Access"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    installation_api_v1_agent_admin_installation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    install_api_v1_agent_admin_installation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    create_api_v1_agent_admin_keys_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewAgent"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_api_v1_agent_admin_keys__identity__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                identity: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_api_v1_health_get: {
         parameters: {
             query?: never;
@@ -1077,6 +1456,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Job"][];
+                };
+            };
+        };
+    };
+    select_candidate_api_v1_tts_history__key__select_candidate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateSelection"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

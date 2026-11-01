@@ -5,6 +5,161 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/api/v1/agent-admin": {
+      "get": {
+        "summary": "State",
+        "operationId": "state_api_v1_agent_admin_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent-admin/access": {
+      "put": {
+        "summary": "Access",
+        "operationId": "access_api_v1_agent_admin_access_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Access"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent-admin/installation": {
+      "get": {
+        "summary": "Installation",
+        "operationId": "installation_api_v1_agent_admin_installation_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Install",
+        "operationId": "install_api_v1_agent_admin_installation_post",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent-admin/keys": {
+      "post": {
+        "summary": "Create",
+        "operationId": "create_api_v1_agent_admin_keys_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewAgent"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent-admin/keys/{identity}": {
+      "delete": {
+        "summary": "Revoke",
+        "operationId": "revoke_api_v1_agent_admin_keys__identity__delete",
+        "parameters": [
+          {
+            "name": "identity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/health": {
       "get": {
         "summary": "Health",
@@ -286,6 +441,55 @@
                   },
                   "type": "array",
                   "title": "Response History Api V1 Tts History Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tts/history/{key}/select-candidate": {
+      "post": {
+        "summary": "Select Candidate",
+        "operationId": "select_candidate_api_v1_tts_history__key__select_candidate_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CandidateSelection"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -906,6 +1110,19 @@
   },
   "components": {
     "schemas": {
+      "Access": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "Access"
+      },
       "Body_create_voice_api_v1_voices_post": {
         "properties": {
           "file": {
@@ -969,6 +1186,133 @@
           "file"
         ],
         "title": "Body_transcribe_api_v1_stt_transcribe_post"
+      },
+      "Candidate": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed"
+          },
+          "asset_id": {
+            "type": "string",
+            "title": "Asset Id"
+          },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/Segment"
+            },
+            "type": "array",
+            "title": "Segments"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/Metrics"
+          },
+          "scoring": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CandidateScoring"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "seed",
+          "asset_id",
+          "segments",
+          "metrics"
+        ],
+        "title": "Candidate"
+      },
+      "CandidateError": {
+        "properties": {
+          "seed": {
+            "type": "integer",
+            "title": "Seed"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "seed",
+          "error"
+        ],
+        "title": "CandidateError"
+      },
+      "CandidateScoring": {
+        "properties": {
+          "transcript": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcript"
+          },
+          "fidelity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fidelity"
+          },
+          "speaker_similarity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speaker Similarity"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "title": "CandidateScoring"
+      },
+      "CandidateSelection": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Index"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index"
+        ],
+        "title": "CandidateSelection"
       },
       "Chat": {
         "properties": {
@@ -1062,18 +1406,70 @@
             "default": "tr"
           },
           "exaggeration": {
-            "type": "number",
-            "maximum": 2.0,
-            "minimum": 0.0,
-            "title": "Exaggeration",
-            "default": 0.5
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 2.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exaggeration"
           },
           "cfg_weight": {
-            "type": "number",
-            "maximum": 1.0,
-            "minimum": 0.0,
-            "title": "Cfg Weight",
-            "default": 0.5
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cfg Weight"
+          },
+          "speech_quality": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "fast",
+                  "balanced",
+                  "quality"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speech Quality"
+          },
+          "compare_candidates": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compare Candidates"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 4294967295.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
           },
           "provider": {
             "type": "string",
@@ -1225,6 +1621,89 @@
               }
             ],
             "title": "Asset Id"
+          },
+          "reference_asset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Asset Id"
+          },
+          "speech_quality": {
+            "type": "string",
+            "enum": [
+              "fast",
+              "balanced",
+              "quality"
+            ],
+            "title": "Speech Quality",
+            "default": "balanced"
+          },
+          "compare_candidates": {
+            "type": "boolean",
+            "title": "Compare Candidates",
+            "default": false
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "voice_snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoiceSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "candidate_errors": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateError"
+            },
+            "type": "array",
+            "title": "Candidate Errors"
+          },
+          "selected_candidate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Candidate"
           }
         },
         "type": "object",
@@ -1340,6 +1819,33 @@
         "type": "object",
         "title": "Metrics"
       },
+      "NewAgent": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Scopes"
+          },
+          "voice": {
+            "type": "string",
+            "title": "Voice",
+            "default": "asya-default"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "NewAgent"
+      },
       "Segment": {
         "properties": {
           "index": {
@@ -1403,6 +1909,21 @@
             "maxLength": 12000,
             "title": "System Prompt",
             "default": "Türkçe konuşan, sıcak ve dikkatli bir asistansın. Kullanıcının sorusuna doğrudan cevap ver; kısa sorulara kısa, ayrıntı istenince yeterince açıklayıcı yanıtlar ver. Bilmediğin konularda tahminini gerçek gibi sunma. Doğal konuşma dili ve anlaşılır cümleler kullan."
+          },
+          "speech_quality": {
+            "type": "string",
+            "enum": [
+              "fast",
+              "balanced",
+              "quality"
+            ],
+            "title": "Speech Quality",
+            "default": "balanced"
+          },
+          "compare_candidates": {
+            "type": "boolean",
+            "title": "Compare Candidates",
+            "default": false
           },
           "chat_speech_rate": {
             "type": "number",
@@ -1549,6 +2070,57 @@
             "type": "string",
             "title": "Asset Id"
           },
+          "reference_asset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Asset Id"
+          },
+          "original_asset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Asset Id"
+          },
+          "reference_start": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Start"
+          },
+          "reference_end": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference End"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
           "duration": {
             "type": "number",
             "title": "Duration"
@@ -1589,6 +2161,89 @@
         ],
         "title": "Voice"
       },
+      "VoiceSnapshot": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "exaggeration": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exaggeration"
+          },
+          "cfg_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cfg Weight"
+          },
+          "reference_start": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Start"
+          },
+          "reference_end": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference End"
+          },
+          "asset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Id"
+          },
+          "reference_asset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Asset Id"
+          }
+        },
+        "type": "object",
+        "title": "VoiceSnapshot"
+      },
       "VoiceUpdate": {
         "properties": {
           "name": {
@@ -1615,6 +2270,30 @@
             "minimum": 0.0,
             "title": "Cfg Weight",
             "default": 0.5
+          },
+          "reference_start": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Start"
+          },
+          "reference_end": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference End"
           }
         },
         "type": "object",

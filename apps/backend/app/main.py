@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import mimetypes
 import os
 import time
 from contextlib import asynccontextmanager
@@ -12,13 +13,14 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, Web
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.formparsers import MultiPartException
 
 from .core import Store, ROOT, uid
-from .schemas import Generation, Settings, Chat, VoiceUpdate, ConversationCreate, LANGUAGES, Job, Voice
+from .schemas import Generation, Settings, Chat, VoiceUpdate, ConversationCreate, CandidateSelection, LANGUAGES, Job, Voice
 from .engines import Engines, gpu_status, REGISTRY
 from .llm import LMClient
 from .chat import ChatService
-from .audio import MAX_UPLOAD, convert_audio, export_mp3, peaks
+from .audio import MAX_UPLOAD, MAX_VOICE_UPLOAD, convert_audio, export_mp3, peaks, reference_clip
 from .network import NetworkAccess
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s %(message)s')
@@ -61,20 +63,32 @@ def create_app(store=None, provider=None, network=None):
             return JSONResponse({'detail':'Origin erişimi reddedildi.'}, status_code=403)
         if request.headers.get('sec-fetch-site') == 'cross-site':
             return JSONResponse({'detail':'Siteler arası erişim reddedildi.'}, status_code=403)
-        if int(request.headers.get('content-length', '0')) > MAX_UPLOAD + 1024 * 1024:
-            return JSONResponse({'detail':'Dosya en fazla 25 MB olabilir.'}, status_code=413)
+        limit = MAX_VOICE_UPLOAD if request.method == 'POST' and request.url.path == '/api/v1/voices' else MAX_UPLOAD
+        try:
+            content_length = int(request.headers.get('content-length', '0'))
+        except ValueError:
+            return JSONResponse({'detail':'Geçersiz içerik uzunluğu.'}, status_code=400)
+        if content_length < 0:
+            return JSONResponse({'detail':'Geçersiz içerik uzunluğu.'}, status_code=400)
+        if content_length > limit + 1024 * 1024:
+            return JSONResponse({'detail':f'Dosya en fazla {limit // (1024 * 1024)} MB olabilir.'}, status_code=413)
+        exceeded = False
         if request.method in ('POST', 'PUT'):
             original_receive = request._receive
             received = 0
             async def limited_receive():
-                nonlocal received
+                nonlocal received, exceeded
                 message = await original_receive()
                 received += len(message.get('body', b''))
-                if received > MAX_UPLOAD + 1024 * 1024:
-                    raise HTTPException(413, 'İstek boyutu aşıldı.')
+                if received > limit + 1024 * 1024:
+                    exceeded = True
+                    raise MultiPartException('İstek boyutu aşıldı.')
                 return message
             request._receive = limited_receive
-        return await call_next(request)
+        response = await call_next(request)
+        if exceeded:
+            return JSONResponse({'detail':'İstek boyutu aşıldı.'}, status_code=413)
+        return response
 
     @app.exception_handler(ValueError)
     async def value_error(request, exc):
@@ -92,22 +106,36 @@ def create_app(store=None, provider=None, network=None):
             raise HTTPException(404, 'Kayıt bulunamadı.')
         return value
 
-    async def upload(file, folder, max_seconds):
+    async def upload(file, folder, max_seconds, preserve_original=False):
         key = uid()
-        source = store.root / folder / f'{key}.upload'
+        suffix = Path(file.filename or '').suffix.lower()
+        suffix = suffix if suffix in {'.wav', '.mp3', '.m4a', '.mp4', '.ogg', '.flac', '.webm', '.aac'} else '.upload'
+        source = store.root / folder / f'{key}.original{suffix}'
         target = store.root / folder / f'{key}.wav'
         size = 0
+        asset = None
         try:
             with source.open('wb') as stream:
                 while chunk := await file.read(1024 * 1024):
                     size += len(chunk)
-                    if size > MAX_UPLOAD:
-                        raise HTTPException(413, 'Dosya en fazla 25 MB olabilir.')
+                    if size > (MAX_VOICE_UPLOAD if preserve_original else MAX_UPLOAD):
+                        raise HTTPException(413, f'Dosya en fazla {200 if preserve_original else 25} MB olabilir.')
                     stream.write(chunk)
             metadata = await asyncio.to_thread(convert_audio, source, target, max_seconds)
-            return store.add_asset(target, **metadata)
+            asset = store.add_asset(target, **metadata)
+            if preserve_original:
+                original = store.add_asset(source, original=True)
+                asset['original_asset_id'] = original['id']
+                source = None
+            return asset
+        except Exception:
+            if asset:
+                store.delete('asset', asset['id'])
+            target.unlink(missing_ok=True)
+            raise
         finally:
-            source.unlink(missing_ok=True)
+            if source is not None:
+                source.unlink(missing_ok=True)
             await file.close()
 
     @app.get('/api/v1/health')
@@ -177,18 +205,45 @@ def create_app(store=None, provider=None, network=None):
     async def history():
         return store.list('job')
 
+    @app.post('/api/v1/tts/history/{key}/select-candidate', response_model=Job)
+    async def select_candidate(key: str, body: CandidateSelection):
+        record = get('job', key)
+        if record['status'] != 'completed':
+            raise HTTPException(409, 'Aday seçmek için üretim tamamlanmalı.')
+        candidates = record.get('candidates') or []
+        if body.index >= len(candidates):
+            raise HTTPException(400, 'Aday bulunamadı.')
+        candidate = candidates[body.index]
+        if not store.get('asset', candidate.get('asset_id', '')):
+            raise HTTPException(400, 'Aday ses dosyası bulunamadı.')
+        metrics = dict(record.get('metrics') or {})
+        duration = (candidate.get('metrics') or {}).get('duration')
+        if duration:
+            metrics['duration'] = duration
+            if metrics.get('synthesis_seconds') is not None:
+                metrics['rtf'] = metrics['synthesis_seconds'] / duration
+        return store.put('job', {**record, 'selected_candidate':body.index,
+                                 'asset_id':candidate['asset_id'], 'segments':candidate['segments'],
+                                 'metrics':metrics})
+
     @app.delete('/api/v1/tts/history/{key}')
     async def delete_generation(key: str):
         record = get('job', key)
         if record['status'] in ('queued','running','cancelling'):
             raise HTTPException(409, 'Önce üretimi iptal edin ve tamamlanmasını bekleyin.')
-        for asset_id in [record.get('asset_id')] + [s['asset_id'] for s in record['segments']]:
+        candidates = record.get('candidates') or []
+        asset_ids = [record.get('asset_id')] + [s['asset_id'] for s in record['segments']]
+        asset_ids += [c.get('asset_id') for c in candidates] + [s['asset_id'] for c in candidates for s in c.get('segments', [])]
+        for asset_id in set(filter(None, asset_ids)):
             if asset_id and store.get('asset', asset_id):
                 path = store.asset(asset_id)
                 path.unlink(missing_ok=True)
                 path.with_suffix('.mp3').unlink(missing_ok=True)
                 store.delete('asset', asset_id)
         store.delete('job', key)
+        reference = record.get('reference_asset_id')
+        if reference and not asset_referenced(reference):
+            remove_asset(reference)
         return dict(deleted=True)
 
     @app.post('/api/v1/tts/warmup')
@@ -220,25 +275,77 @@ def create_app(store=None, provider=None, network=None):
             raise HTTPException(400, 'Profil adı boş olamaz.')
         if language not in LANGUAGES:
             raise HTTPException(400, 'Desteklenmeyen dil.')
-        asset = await upload(file, 'voices', 60)
-        return store.put('voice', dict(name=name.strip(), language=language, asset_id=asset['id'],
-                                      duration=asset['duration'], sample_rate=asset['sample_rate'],
-                                      consent=True, exaggeration=.5, cfg_weight=.5))
+        asset = await upload(file, 'voices', 300, preserve_original=True)
+        clip_path = store.root / 'voices' / f'{uid()}.wav'
+        clip = None
+        try:
+            selection = await asyncio.to_thread(reference_clip, store.asset(asset['id']), clip_path)
+            clip = store.add_asset(clip_path)
+            return store.put('voice', dict(name=name.strip(), language=language, asset_id=asset['id'],
+                                          original_asset_id=asset['original_asset_id'], reference_asset_id=clip['id'],
+                                          **selection, duration=asset['duration'], sample_rate=asset['sample_rate'],
+                                          consent=True, exaggeration=.5, cfg_weight=.5))
+        except Exception:
+            if clip:
+                store.delete('asset', clip['id'])
+            clip_path.unlink(missing_ok=True)
+            for asset_id in (asset['id'], asset['original_asset_id']):
+                remove_asset(asset_id)
+            raise
+
+    def remove_asset(asset_id):
+        if asset_id and store.get('asset', asset_id):
+            path = store.asset(asset_id)
+            path.unlink(missing_ok=True)
+            path.with_suffix('.mp3').unlink(missing_ok=True)
+            store.delete('asset', asset_id)
+
+    def asset_referenced(asset_id):
+        return (any(asset_id in (v.get('asset_id'), v.get('reference_asset_id'), v.get('original_asset_id'))
+                    for v in store.list('voice', limit=1000000)) or
+                any(j.get('reference_asset_id') == asset_id for j in store.list('job', limit=1000000)))
+
+    def voice_in_use(key):
+        return bool(chat.active_voices.get(key)) or any(j.get('voice_id') == key and j['status'] in ('queued','running','cancelling')
+                   for j in store.list('job', limit=1000000))
 
     @app.put('/api/v1/voices/{key}', response_model=Voice)
     async def update_voice(key: str, body: VoiceUpdate):
-        return store.put('voice', {**get('voice', key), **body.model_dump()})
+        record = get('voice', key)
+        values = body.model_dump(exclude_unset=True)
+        changing_reference = 'reference_start' in values or 'reference_end' in values
+        start, end = values.pop('reference_start', None), values.pop('reference_end', None)
+        if changing_reference:
+            if start is None or end is None:
+                raise HTTPException(400, 'Referans başlangıcı ve bitişi birlikte belirtilmeli.')
+            if voice_in_use(key):
+                raise HTTPException(409, 'Bu ses aktif üretimde kullanılıyor.')
+            target = store.root / 'voices' / f'{uid()}.wav'
+            clip = None
+            try:
+                selection = reference_clip(store.asset(record['asset_id']), target, start, end)
+                clip = store.add_asset(target)
+                old = record.get('reference_asset_id')
+                record = store.put('voice', {**record, **values, **selection, 'reference_asset_id':clip['id']})
+            except Exception:
+                if clip:
+                    store.delete('asset', clip['id'])
+                target.unlink(missing_ok=True)
+                raise
+            if old and not asset_referenced(old):
+                remove_asset(old)
+            return record
+        return store.put('voice', {**record, **values})
 
     @app.delete('/api/v1/voices/{key}')
     async def delete_voice(key: str):
         record = get('voice', key)
-        if any(j.get('voice_id') == key and j['status'] in ('queued','running','cancelling') for j in store.list('job')):
+        if voice_in_use(key):
             raise HTTPException(409, 'Bu ses aktif üretimde kullanılıyor.')
-        path = store.asset(record['asset_id'])
-        path.unlink(missing_ok=True)
-        path.with_suffix('.mp3').unlink(missing_ok=True)
-        store.delete('asset', record['asset_id'])
         store.delete('voice', key)
+        for asset_id in set(filter(None, (record.get('asset_id'), record.get('reference_asset_id'), record.get('original_asset_id')))):
+            if not asset_referenced(asset_id):
+                remove_asset(asset_id)
         settings = store.settings()
         if settings['default_voice'] == key:
             store.put('settings', {**settings, 'id':'app', 'default_voice':''})
@@ -247,6 +354,10 @@ def create_app(store=None, provider=None, network=None):
     @app.get('/api/v1/audio/{key}')
     async def audio(key: str, format: str = 'wav'):
         source = store.asset(key)
+        asset_record = store.get('asset', key)
+        if asset_record.get('original') and format == 'wav':
+            media_type = mimetypes.guess_type(source.name)[0] or 'application/octet-stream'
+            return FileResponse(source, media_type=media_type, filename=f'original-{key}{source.suffix}')
         if format not in ('wav', 'mp3'):
             raise HTTPException(400, 'Desteklenen biçimler: wav, mp3')
         if format == 'mp3':

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AudioLines,
   ArrowRight,
@@ -23,17 +23,20 @@ import {
 } from "../components/ui";
 import type { Voice, Settings, Job } from "../types";
 import { presets } from "../catalog";
+import GenerationDetails from "../components/GenerationDetails";
 
 export default function Studio({
   voices,
   settings,
   reuse,
+  refresh,
   fail,
   notify,
 }: {
   voices: Voice[];
   settings: Settings | null;
   reuse: Job | null;
+  refresh: () => Promise<void>;
 } & Feedback) {
   const [text, setText] = useState("");
   const [voice, setVoice] = useState("");
@@ -44,7 +47,14 @@ export default function Studio({
   const [job, setJob] = useState<Job | null>(null);
   const [comparison, setComparison] = useState<Job | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [speechQuality, setSpeechQuality] =
+    useState<Settings["speech_quality"]>("balanced");
+  const [compareCandidates, setCompareCandidates] = useState(false);
+  const [seed, setSeed] = useState<number | null>(null);
+  const [speechRate, setSpeechRate] = useState(1);
   const [preview, setPreview] = useState<string | null>(null);
+  const initializedProfile = useRef<string | null>(null);
   useEffect(() => {
     if (settings) {
       setVoice(settings.default_voice);
@@ -52,12 +62,29 @@ export default function Studio({
     }
   }, [settings?.default_voice, settings?.language]);
   useEffect(() => {
+    const id = settings?.default_voice ?? "";
+    if (reuse || initializedProfile.current === id) return;
+    const selected = voices.find((v) => v.id === id);
+    if (id && !selected) return;
+    initializedProfile.current = id;
+    setExaggeration(selected?.exaggeration ?? 0.5);
+    setCfg(selected?.cfg_weight ?? 0.5);
+  }, [settings?.default_voice, voices, reuse]);
+  useEffect(() => {
+    setSpeechQuality(settings?.speech_quality ?? "balanced");
+    setCompareCandidates(settings?.compare_candidates ?? false);
+  }, [settings?.speech_quality, settings?.compare_candidates]);
+  useEffect(() => {
     if (reuse) {
       setText(reuse.text);
       setVoice(reuse.voice_id || "");
       setLanguage(reuse.language);
       setExaggeration(reuse.exaggeration);
       setCfg(reuse.cfg_weight);
+      setSpeechQuality(reuse.speech_quality ?? "balanced");
+      setCompareCandidates(reuse.compare_candidates ?? false);
+      setSeed(reuse.seed ?? null);
+      setSpeechRate(reuse.speech_rate ?? 1);
     }
   }, [reuse]);
   const active =
@@ -96,6 +123,10 @@ export default function Studio({
           exaggeration,
           cfg_weight: cfg,
           provider: "chatterbox",
+          speech_quality: speechQuality,
+          compare_candidates: compareCandidates,
+          seed,
+          speech_rate: speechRate,
         }),
       );
     } catch (e) {
@@ -113,6 +144,30 @@ export default function Studio({
       setLanguage(selected.language);
     }
   };
+  async function saveProfile() {
+    const selected = voices.find((v) => v.id === voice);
+    if (!selected) return;
+    setSavingProfile(true);
+    try {
+      await api(`/voices/${selected.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          name: selected.name,
+          language: selected.language,
+          exaggeration,
+          cfg_weight: cfg,
+        }),
+      });
+      await refresh();
+      notify(
+        "İfade ve CFG ses profiline kaydedildi. Yeni üretimlerde uygulanır.",
+      );
+    } catch (e) {
+      fail(e);
+    } finally {
+      setSavingProfile(false);
+    }
+  }
   return (
     <>
       <div className="studio-grid">
@@ -166,7 +221,11 @@ export default function Studio({
             <button
               className="text-link preview-link"
               onClick={() =>
-                setPreview(voices.find((v) => v.id === voice)?.asset_id || null)
+                setPreview(
+                  voices.find((v) => v.id === voice)?.reference_asset_id ||
+                    voices.find((v) => v.id === voice)?.asset_id ||
+                    null,
+                )
               }
             >
               <Volume2 size={14} />
@@ -214,6 +273,58 @@ export default function Studio({
               setCfg(v);
               setPreset("Özel");
             }}
+          />
+          <p className="help-text">
+            İfade anlatım yoğunluğunu, CFG metne ve referansa yönlendirmeyi
+            etkiler; ses perdesi veya üretim kalitesi ayarı değildir.
+            Değişiklikler yalnızca yeni üretimlere uygulanır. Kaydetmek mevcut
+            ses dosyalarını değiştirmez.
+          </p>
+          <button
+            className="button secondary"
+            disabled={!voice || savingProfile}
+            onClick={() => void saveProfile()}
+          >
+            {savingProfile
+              ? "Kaydediliyor…"
+              : "İfade ve CFG’yi seçili profile kaydet"}
+          </button>
+          <div className="control-divider" />
+          <p className="help-text">
+            Üretim:{" "}
+            {speechQuality === "quality"
+              ? "Kalite (deneysel)"
+              : speechQuality === "fast"
+                ? "Hızlı"
+                : "Dengeli"}
+            {compareCandidates
+              ? " · İki aday (yaklaşık iki kat hesaplama)"
+              : " · Tek aday"}
+            . Varsayılanları Ayarlar → Ses ve Konuşma bölümünden
+            değiştirebilirsiniz.
+          </p>
+          <Range
+            label="Stüdyo konuşma hızı"
+            value={speechRate}
+            min={0.75}
+            max={1.15}
+            step={0.05}
+            onChange={setSpeechRate}
+          />
+          <p className="help-text">
+            Tempo ayrı uygulanır; 1,00× modelin doğal hızıdır.
+          </p>
+          <label htmlFor="generation-seed">SEED (İSTEĞE BAĞLI)</label>
+          <input
+            id="generation-seed"
+            type="number"
+            min={0}
+            max={4294967295}
+            value={seed ?? ""}
+            placeholder="Rastgele"
+            onChange={(e) =>
+              setSeed(e.target.value === "" ? null : Number(e.target.value))
+            }
           />
           <div className="model-box">
             <span className="model-icon">
@@ -292,6 +403,14 @@ export default function Studio({
           {job ? statusLabel[job.status] : "Henüz bir üretim yok"}
         </span>
       </div>
+      {job && (
+        <GenerationDetails
+          job={job}
+          fail={fail}
+          onSelect={setJob}
+          output={settings?.output_id}
+        />
+      )}
       {job?.asset_id ? (
         <>
           <Player asset={job.asset_id} output={settings?.output_id} />

@@ -6,7 +6,44 @@ import time
 import httpx
 
 
-def speech_text(text: str) -> str:
+_TURKISH_ONES = ('', 'bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz', 'dokuz')
+_TURKISH_TENS = ('', 'on', 'yirmi', 'otuz', 'kırk', 'elli', 'altmış', 'yetmiş', 'seksen', 'doksan')
+
+
+def _number_tr(value: int) -> str:
+    if value == 0:
+        return 'sıfır'
+    if value >= 1_000_000_000:
+        return ' '.join(_TURKISH_ONES[int(d)] or 'sıfır' for d in str(value))
+    def under_thousand(n):
+        hundreds, rest = divmod(n, 100)
+        result = (('' if hundreds == 1 else _TURKISH_ONES[hundreds] + ' ') + 'yüz') if hundreds else ''
+        tens, ones = divmod(rest, 10)
+        return ' '.join(x for x in (result, _TURKISH_TENS[tens], _TURKISH_ONES[ones]) if x)
+    millions, remainder = divmod(value, 1_000_000)
+    thousands, remainder = divmod(remainder, 1000)
+    return ' '.join(x for x in (under_thousand(millions) + ' milyon' if millions else '',
+                                  (under_thousand(thousands) + ' ' if thousands > 1 else '') + 'bin' if thousands else '',
+                                  under_thousand(remainder)) if x)
+
+
+def normalize_speech_numbers(text: str) -> str:
+    """Normalize common Turkish numerals on the spoken path only."""
+    # Preserve leading fractional zeros; leave dates, times and version numbers
+    # intact because interpreting their punctuation requires context.
+    def spoken_number(digits):
+        return (' '.join(_TURKISH_ONES[int(d)] or 'sıfır' for d in digits)
+                if len(digits) > 1 and digits.startswith('0') else _number_tr(int(digits)))
+
+    def decimal(match):
+        fraction = match[2]
+        return spoken_number(match[1]) + ' virgül ' + spoken_number(fraction)
+    text = re.sub(r'(?<!\w)(?<![0-9][.,:/])([0-9]+),([0-9]+)(?!\w|[.,:/][0-9])', decimal, text)
+    return re.sub(r'(?<!\w)(?<![0-9][.,:/])[0-9]+(?!\w|[.,:/][0-9])',
+                  lambda m: spoken_number(m[0]), text)
+
+
+def speech_text(text: str, language: str = 'tr') -> str:
     text = re.sub(r'<think>.*?</think>', '', text, flags=re.S)
     text = re.sub(r'<think>.*$', '', text, flags=re.S)
     text = re.sub(r'```.*?```', '', text, flags=re.S)
@@ -16,6 +53,9 @@ def speech_text(text: str) -> str:
     text = re.sub(r'(?m)^\s*(?:#{1,6}\s*|[-*+]\s+)', '', text)
     text = re.sub(r'[\U0001f000-\U0001faff\u2600-\u27bf\ufe0f\u200d]', '', text)
     text = re.sub(r'[*_`]', '', text).strip()
+    if language.lower().replace('_', '-').split('-')[0] == 'tr':
+        text = re.sub(r'\b(Dr|Prof|Doç|Sn|Av)\.(?=\s|$)', lambda m: {'dr':'doktor', 'prof':'profesör', 'doç':'doçent', 'sn':'sayın', 'av':'avukat'}[m[1].lower()], text, flags=re.I)
+        text = normalize_speech_numbers(text)
     return text if any(c.isalnum() for c in text) else ''
 
 

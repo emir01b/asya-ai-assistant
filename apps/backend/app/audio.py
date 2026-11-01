@@ -7,6 +7,7 @@ import soundfile as sf
 import imageio_ffmpeg
 
 MAX_UPLOAD = 25 * 1024 * 1024
+MAX_VOICE_UPLOAD = 200 * 1024 * 1024
 
 
 def pace_audio(samples: np.ndarray, sample_rate: int, rate: float, pause_ms: int) -> np.ndarray:
@@ -57,3 +58,48 @@ def peaks(path: Path, count=160):
     mono = samples.mean(axis=1)
     return [round(float(np.max(np.abs(part))), 4) if part.size else 0
             for part in np.array_split(mono, count)]
+
+
+def reference_clip(source: Path, target: Path, start: float | None = None, end: float | None = None):
+    """Select a short, audible reference without altering its signal."""
+    samples, rate = sf.read(source, dtype='float32', always_2d=True)
+    mono = samples.mean(axis=1)
+    duration = len(mono) / rate
+    if start is None and end is None:
+        length = min(duration, 8.0)
+        width = round(length * rate)
+        # Heuristic only: favor audible, varied passages, penalizing silent and clipped
+        # frames. This does not identify speech or guarantee a clean recording.
+        def score(i):
+            window = mono[i:i + width]
+            frame_size = max(1, rate // 10)
+            frame_rms = np.array([np.sqrt(np.mean(part ** 2)) for part in
+                                  (window[j:j + frame_size] for j in range(0, len(window), frame_size))])
+            level = float(np.sqrt(np.mean(window ** 2)))
+            audible = min(level / .03, 1.0)
+            silence = float(np.mean(frame_rms < .003))
+            clipping = float(np.mean(np.abs(window) >= .999))
+            variation = min(float(np.std(frame_rms)) / .03, 1.0)
+            return audible + .3 * variation - silence - min(clipping * 20, 2) - max(0, level - .3)
+        offsets = range(0, max(1, len(mono) - width + 1), rate)
+        offset = max(offsets, key=score)
+        start, end = offset / rate, (offset + width) / rate
+    if start is None or end is None or start < 0 or end <= start or end > duration + 1e-7:
+        raise ValueError('Referans aralığı ses süresi içinde olmalı.')
+    a, b = round(start * rate), min(len(mono), round(end * rate))
+    if b <= a or (b - a) / rate < .25:
+        raise ValueError('Referans en az 0,25 saniye olmalı.')
+    clip = mono[a:b]
+    sf.write(target, clip, rate, subtype='PCM_16')
+    rms = float(np.sqrt(np.mean(clip ** 2)))
+    peak = float(np.max(np.abs(clip)))
+    warnings = []
+    if rms < 0.003:
+        warnings.append('Seçilen referans sessiz veya neredeyse sessiz.')
+    elif rms < 0.02:
+        warnings.append('Seçilen referansın ses seviyesi düşük.')
+    if peak >= 0.999:
+        warnings.append('Seçilen referansta kırpılma olabilir.')
+    if len(clip) / rate < 6 or len(clip) / rate > 10:
+        warnings.append('Referans için 6–10 saniyelik temiz konuşma önerilir.')
+    return dict(reference_start=a / rate, reference_end=b / rate, warnings=warnings)

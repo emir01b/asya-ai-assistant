@@ -26,6 +26,7 @@ def now() -> str:
 DEFAULTS = dict(
     lm_url='http://127.0.0.1:1234/v1', llm_model='', temperature=0.7,
     system_prompt=DEFAULT_SYSTEM_PROMPT, chat_speech_rate=0.9,
+    speech_quality='balanced', compare_candidates=False,
     offline=True, tts_device='cuda', stt_device='cuda', stt_model='large-v3-turbo',
     stt_cpu_fallback=True, language='tr', default_voice='', vad_threshold=0.018,
     vad_silence_ms=1000, microphone_id='', output_id='', debug=False,

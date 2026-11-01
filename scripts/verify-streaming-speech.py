@@ -25,7 +25,7 @@ from apps.backend.app.schemas import Chat
 async def main():
     settings = Store().settings()
     store = Store(ROOT / 'data/verification/streaming-speech')
-    store.put('settings', {**settings, 'id': 'app', 'default_voice': ''})
+    store.put('settings', {**settings, 'id': 'app', 'default_voice': '', 'speech_quality': 'fast'})
     # Reuse an already consented voice, if one is available, in the isolated store.
     voices = [v for v in Store().list('voice') if v.get('consent')]
     voice_id = None

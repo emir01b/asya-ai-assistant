@@ -56,7 +56,7 @@ class FakeProvider:
             time.sleep(self.delay)
             if self.error:
                 raise RuntimeError(self.error)
-            return np.zeros(2400, dtype=np.float32), 24000, self.delay, None
+            return (0.1 * np.sin(np.arange(2400) * .03)).astype(np.float32), 24000, self.delay, None
         finally:
             self.parallel -= 1
 
@@ -100,7 +100,7 @@ class APITests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/v1/health',headers={'Host':'evil.example'}).status_code,403)
 
     def test_oversized_upload_rejected_before_decode(self):
-        self.assertEqual(self.client.post('/api/v1/voices',headers={'Content-Length':str(28*1024*1024)},content=b'x').status_code,413)
+        self.assertEqual(self.client.post('/api/v1/voices',headers={'Content-Length':str(202*1024*1024)},content=b'x').status_code,413)
 
     def test_settings_persist_and_remote_url_rejected(self):
         settings = self.client.get('/api/v1/settings').json()
@@ -122,6 +122,92 @@ class APITests(unittest.TestCase):
         self.assertEqual(len(self.client.get('/api/v1/audio/'+voice['asset_id']+'/peaks').json()['peaks']),160)
         self.assertEqual(self.client.delete('/api/v1/voices/'+voice['id']).status_code,200)
         self.assertEqual(self.client.get('/api/v1/voices/'+voice['id']).status_code,404)
+
+    def test_reference_selection_preserves_original_and_cleans_old_clip(self):
+        original = wav_bytes(12)
+        r = self.client.post('/api/v1/voices', data=dict(name='Uzun', consent='true'),
+                             files={'file':('../../example.wav', original, 'audio/wav')})
+        self.assertEqual(r.status_code, 201, r.text)
+        voice = r.json()
+        self.assertEqual(self.store.asset(voice['original_asset_id']).read_bytes(), original)
+        self.assertAlmostEqual(voice['reference_end'] - voice['reference_start'], 8, places=2)
+        self.assertNotEqual(voice['reference_asset_id'], voice['asset_id'])
+        old = voice['reference_asset_id']
+        body = dict(name='Uzun', reference_start=2, reference_end=9)
+        result = self.client.put('/api/v1/voices/' + voice['id'], json=body)
+        self.assertEqual(result.status_code, 200, result.text)
+        self.assertEqual(result.json()['reference_start'], 2)
+        self.assertIsNone(self.store.get('asset', old))
+        self.assertEqual(self.client.put('/api/v1/voices/' + voice['id'], json={**body, 'reference_end':13}).status_code, 400)
+        self.assertEqual(self.client.put('/api/v1/voices/' + voice['id'], json={**body, 'reference_start':None}).status_code, 400)
+        self.store.put('job', dict(voice_id=voice['id'], status='queued'))
+        self.assertEqual(self.client.put('/api/v1/voices/' + voice['id'], json=body).status_code, 409)
+        self.assertEqual(self.client.delete('/api/v1/voices/' + voice['id']).status_code, 409)
+
+    def test_reference_suggestion_penalizes_clipping(self):
+        signal = np.concatenate([np.ones(8*24000, dtype='float32'),
+                                 np.sin(np.arange(8*24000)*.03).astype('float32') * .1])
+        data = io.BytesIO(); sf.write(data, signal, 24000, format='WAV')
+        response = self.client.post('/api/v1/voices', data=dict(name='Clip', consent='true'),
+                                    files={'file':('x.wav', data.getvalue(), 'audio/wav')})
+        self.assertEqual(response.status_code, 201, response.text)
+        self.assertGreaterEqual(response.json()['reference_start'], 7)
+        self.assertFalse(any('kırpılma' in warning for warning in response.json()['warnings']))
+
+    def test_history_keeps_used_reference_after_edit_and_voice_deletion(self):
+        voice = self.voice().json()
+        result = self.client.post('/api/v1/tts/generate', json=dict(text='Merhaba.', voice_id=voice['id']))
+        job = self.wait(result.json()['id'])
+        reference = job['reference_asset_id']
+        changed = self.client.put('/api/v1/voices/' + voice['id'], json=dict(name='Yeni', reference_start=0, reference_end=.5))
+        self.assertEqual(changed.status_code, 200, changed.text)
+        self.assertEqual(self.client.get('/api/v1/audio/' + reference).status_code, 200)
+        self.assertEqual(self.client.delete('/api/v1/voices/' + voice['id']).status_code, 200)
+        self.assertEqual(self.client.get('/api/v1/audio/' + reference).status_code, 200)
+        self.assertEqual(self.client.delete('/api/v1/tts/history/' + job['id']).status_code, 200)
+        self.assertIsNone(self.store.get('asset', reference))
+
+    def test_candidate_selection_is_scoped_to_completed_job(self):
+        a = self.store.root/'generations/a.wav'; a.write_bytes(wav_bytes())
+        b = self.store.root/'generations/b.wav'; b.write_bytes(wav_bytes())
+        first, second = self.store.add_asset(a), self.store.add_asset(b)
+        segment = dict(index=0, text='Hi', asset_id=second['id'], duration=1, generation_seconds=1, ready_seconds=1)
+        job = self.store.put('job', dict(text='Hi', voice_id=None, language='tr', provider='chatterbox',
+            exaggeration=.5, cfg_weight=.5, status='completed', progress=1, segments=[], error=None, metrics={},
+            asset_id=first['id'], candidates=[dict(index=0, seed=1, asset_id=second['id'], segments=[segment], metrics={})]))
+        path = '/api/v1/tts/history/' + job['id'] + '/select-candidate'
+        self.assertEqual(self.client.post(path, json={'index':1}).status_code, 400)
+        selected = self.client.post(path, json={'index':0})
+        self.assertEqual(selected.status_code, 200, selected.text)
+        self.assertEqual(selected.json()['asset_id'], second['id'])
+        self.assertEqual(self.client.delete('/api/v1/tts/history/' + job['id']).status_code, 200)
+        self.assertIsNone(self.store.get('asset', second['id']))
+
+    def test_chunked_upload_is_limited_without_content_length(self):
+        async def send():
+            async def body():
+                yield b'--test\r\nContent-Disposition: form-data; name="name"\r\n\r\nX\r\n'
+                yield b'--test\r\nContent-Disposition: form-data; name="consent"\r\n\r\ntrue\r\n'
+                yield b'--test\r\nContent-Disposition: form-data; name="file"; filename="x.wav"\r\nContent-Type: audio/wav\r\n\r\n'
+                for _ in range(20):
+                    yield b'x' * 65536
+                yield b'\r\n--test--\r\n'
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=self.app), base_url='http://testserver') as client:
+                return await client.post('/api/v1/voices', content=body(), headers={'Content-Type':'multipart/form-data; boundary=test'})
+        with patch('apps.backend.app.main.MAX_VOICE_UPLOAD', 1024):
+            response = asyncio.run(send())
+        self.assertEqual(response.status_code, 413, response.text)
+
+    def test_voice_duration_and_large_upload(self):
+        too_long = wav_bytes(301)
+        r = self.client.post('/api/v1/voices', data=dict(name='Long', consent='true'), files={'file':('x.wav', too_long, 'audio/wav')})
+        self.assertEqual(r.status_code, 400, r.text)
+        data = io.BytesIO()
+        sf.write(data, np.zeros((70 * 96000, 2), dtype='float32'), 96000, format='WAV')
+        self.assertGreater(len(data.getbuffer()), 25 * 1024 * 1024)
+        r = self.client.post('/api/v1/voices', data=dict(name='Large', consent='true'), files={'file':('x.wav', data.getvalue(), 'audio/wav')})
+        self.assertEqual(r.status_code, 201, r.text)
+        self.assertTrue(r.json()['warnings'])
 
     def test_bad_audio_and_missing_consent(self):
         bad = self.client.post('/api/v1/voices',data=dict(name='Bad',consent='true'),files={'file':('fake.wav',b'not audio','audio/wav')})

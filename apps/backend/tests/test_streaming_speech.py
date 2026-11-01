@@ -134,6 +134,7 @@ class StreamingTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_audio_is_delivered_while_llm_is_still_streaming(self):
         audio_ready = asyncio.Event()
+        self.store.put('settings', dict(id='app', speech_quality='fast'))
         events, prompts = [], []
 
         class SlowLM:

@@ -173,6 +173,7 @@ export default function App() {
           {page === "studio" && (
             <Studio
               voices={voices}
+              refresh={refresh}
               settings={settings}
               reuse={reuse}
               fail={fail}

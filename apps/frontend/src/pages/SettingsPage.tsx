@@ -143,8 +143,42 @@ export default function SettingsPage({
         <section className="panel padded">
           <h2>
             <AudioLines size={18} />
-            Ses ve modeller
+            Ses ve Konuşma
           </h2>
+          <label htmlFor="speech-quality">ÜRETİM KALİTESİ</label>
+          <select
+            id="speech-quality"
+            value={value.speech_quality ?? "balanced"}
+            onChange={(e) =>
+              set(
+                "speech_quality",
+                e.target.value as Settings["speech_quality"],
+              )
+            }
+          >
+            <option value="fast">Hızlı</option>
+            <option value="balanced">Dengeli (varsayılan)</option>
+            <option value="quality">Kalite (deneysel)</option>
+          </select>
+          <p className="help-text">
+            Üretim ve metin bölümleme yaklaşımını seçer; konuşma temposu ayrı
+            ayarlanır. Kalite modu deneyseldir: kör dinleme ile üstünlüğü henüz
+            doğrulanmadı.
+          </p>
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={value.compare_candidates ?? false}
+              onChange={(e) => set("compare_candidates", e.target.checked)}
+            />
+            İki aday üret ve karşılaştır
+          </label>
+          <p className="help-text">
+            Varsayılan olarak kapalıdır. İki tam aday üretir; yaklaşık iki kat
+            üretim hesabı ve ek değerlendirme süresi gerektirir. Sonuçları
+            stüdyo veya geçmişten dinleyip seçebilirsiniz. Otomatik seçim kalite
+            garantisi değildir.
+          </p>
           <Range
             label="Sohbet konuşma hızı"
             value={value.chat_speech_rate}

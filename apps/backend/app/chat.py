@@ -14,6 +14,7 @@ class ChatService:
     def __init__(self, store, lm, engines):
         self.store, self.lm, self.engines = store, lm, engines
         self.busy: set[str] = set()
+        self.active_voices: dict[str, int] = {}
 
     async def turn(self, request, emit, cancel, request_id=None, jobs=None):
         started = time.perf_counter()
@@ -32,6 +33,9 @@ class ChatService:
         consumer = None
         first_token = None
         first_audio = None
+        voice_id = None
+        voice_params = {}
+        voice_reserved = False
 
         async def event(kind, **values):
             if not cancel.is_set():
@@ -43,13 +47,18 @@ class ChatService:
                 text = await queue.get()
                 if text is None or cancel.is_set():
                     return
-                clean = speech_text(text)
+                clean = speech_text(text, settings['language'])
                 if not clean:
                     continue
                 await event('state', state='synthesizing')
-                job = self.engines.submit(Generation(text=clean, voice_id=request.voice_id,
+                values = Generation(text=clean, voice_id=voice_id, **voice_params,
                     language=settings['language'], min_segment_chars=60,
-                    speech_rate=settings['chat_speech_rate'], trailing_pause_ms=pause_after(clean)))
+                    speech_quality=settings.get('speech_quality', 'balanced'),
+                    compare_candidates=settings.get('compare_candidates', False),
+                    speech_rate=settings['chat_speech_rate'], trailing_pause_ms=pause_after(clean)).model_dump()
+                values['presegmented'] = True
+                values['voice_id_resolved'] = True
+                job = self.engines.submit(values)
                 jobs.append(job['id'])
                 delivered = 0
                 while not cancel.is_set():
@@ -91,13 +100,21 @@ class ChatService:
             await event('start', conversation_id=cid, user=user)
             await event('state', state='thinking')
             settings = self.store.settings()
+            voice_id = (request.voice_id or settings['default_voice']) if request.speak else None
+            if voice_id:
+                voice = self.store.get('voice', voice_id)
+                if not voice or not voice.get('consent'):
+                    raise ValueError('Ses profili bulunamadı veya kullanım izni yok.')
+                voice_params = {k: voice.get(k) for k in ('exaggeration', 'cfg_weight')}
+                self.active_voices[voice_id] = self.active_voices.get(voice_id, 0) + 1
+                voice_reserved = True
             messages = [dict(role='system', content=conversation_prompt(settings['system_prompt'], request.speak))]
             # Bound context; interrupted assistant messages aren't sent as complete answers.
             messages += completed_context(conversation['messages'][-60:])
             queue = asyncio.Queue(maxsize=16)
             consumer = asyncio.create_task(speak(queue)) if request.speak else None
             assistant = dict(id=uid(), role='assistant', content='', created_at=now(), job_ids=jobs)
-            chunker = SpeechChunker()
+            chunker = SpeechChunker(settings.get('speech_quality', 'balanced'))
             async for token in self.lm.stream(messages, request.model):
                 if cancel.is_set():
                     break
@@ -145,3 +162,7 @@ class ChatService:
             if cancel.is_set():
                 for key in jobs:
                     self.engines.cancel(key)
+            if voice_reserved:
+                self.active_voices[voice_id] -= 1
+                if not self.active_voices[voice_id]:
+                    del self.active_voices[voice_id]

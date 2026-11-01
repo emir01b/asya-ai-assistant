@@ -14,8 +14,11 @@ class Generation(BaseModel):
     text: str = Field(min_length=1, max_length=12000)
     voice_id: str | None = None
     language: str = 'tr'
-    exaggeration: float = Field(default=0.5, ge=0, le=2)
-    cfg_weight: float = Field(default=0.5, ge=0, le=1)
+    exaggeration: float | None = Field(default=None, ge=0, le=2)
+    cfg_weight: float | None = Field(default=None, ge=0, le=1)
+    speech_quality: Literal['fast','balanced','quality'] | None = None
+    compare_candidates: bool | None = None
+    seed: int | None = Field(default=None, ge=0, le=4294967295)
     provider: str = Field(default='chatterbox', pattern=r'^[a-z0-9-]{1,40}$')
     normalize: bool = False
     min_segment_chars: int = Field(default=0, ge=0, le=200)
@@ -42,6 +45,8 @@ class Settings(BaseModel):
     llm_model: str = Field(default='', max_length=300)
     temperature: float = Field(default=0.7, ge=0, le=2)
     system_prompt: str = Field(default=DEFAULT_SYSTEM_PROMPT, max_length=12000)
+    speech_quality: Literal['fast','balanced','quality'] = 'balanced'
+    compare_candidates: bool = False
     chat_speech_rate: float = Field(default=0.9, ge=0.75, le=1.15)
     offline: bool = True
     tts_device: Literal['cuda','cpu'] = 'cuda'
@@ -78,11 +83,17 @@ class Chat(BaseModel):
     speak: bool = True
 
 
+class CandidateSelection(BaseModel):
+    index: int = Field(ge=0)
+
+
 class VoiceUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     language: str = 'tr'
     exaggeration: float = Field(default=0.5, ge=0, le=2)
     cfg_weight: float = Field(default=0.5, ge=0, le=1)
+    reference_start: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    reference_end: float | None = Field(default=None, gt=0, allow_inf_nan=False)
 
     @field_validator('name')
     @classmethod
@@ -123,6 +134,37 @@ class Metrics(BaseModel):
     queue_seconds: float | None = None
 
 
+class CandidateScoring(BaseModel):
+    transcript: str | None = None
+    fidelity: float | None = None
+    speaker_similarity: float | None = None
+    error: str | None = None
+
+
+class Candidate(BaseModel):
+    index: int
+    seed: int
+    asset_id: str
+    segments: list[Segment]
+    metrics: Metrics
+    scoring: CandidateScoring | None = None
+
+
+class CandidateError(BaseModel):
+    seed: int
+    error: str
+
+
+class VoiceSnapshot(BaseModel):
+    name: str | None = None
+    exaggeration: float | None = None
+    cfg_weight: float | None = None
+    reference_start: float | None = None
+    reference_end: float | None = None
+    asset_id: str | None = None
+    reference_asset_id: str | None = None
+
+
 class Job(BaseModel):
     id: str
     created_at: str
@@ -140,6 +182,15 @@ class Job(BaseModel):
     error: str | None
     metrics: Metrics
     asset_id: str | None
+    reference_asset_id: str | None = None
+    speech_quality: Literal['fast','balanced','quality'] = 'balanced'
+    compare_candidates: bool = False
+    seed: int | None = None
+    model: str | None = None
+    voice_snapshot: VoiceSnapshot | None = None
+    candidates: list[Candidate] = Field(default_factory=list)
+    candidate_errors: list[CandidateError] = Field(default_factory=list)
+    selected_candidate: int | None = None
 
 
 class Voice(BaseModel):
@@ -147,6 +198,11 @@ class Voice(BaseModel):
     name: str
     language: str
     asset_id: str
+    reference_asset_id: str | None = None
+    original_asset_id: str | None = None
+    reference_start: float | None = None
+    reference_end: float | None = None
+    warnings: list[str] = Field(default_factory=list)
     duration: float
     sample_rate: int
     consent: bool
